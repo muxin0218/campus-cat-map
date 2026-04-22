@@ -13,7 +13,9 @@
 
 ## 在线预览（GitHub Pages）
 
-仓库推送到 `main` 分支后，会自动构建并部署到 GitHub Pages。
+仓库推送到 `main` 分支后，会自动构建并部署到 `gh-pages` 分支（GitHub Pages 传统部署方式）。
+
+启用方式：`Settings → Pages → Build and deployment → Source: Deploy from a branch`，选择 `gh-pages / (root)`。
 
 预览地址格式：`https://muxin0218.github.io/campus-cat-map/`
   
