@@ -1,20 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import MapView from '../components/MapView';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { MapPin, Search, Camera, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { mockCats } from '../data/mockData';
+import { listCats } from '../api/client';
+import type { CatListItem } from '../api/client';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [cats, setCats] = useState<CatListItem[]>([]);
 
-  const filteredCats = mockCats.filter(cat =>
-    cat.name.includes(searchQuery) ||
-    cat.nickname.includes(searchQuery) ||
-    cat.location.name.includes(searchQuery)
-  );
+  useEffect(() => {
+    void listCats()
+      .then((res) => setCats(res.items))
+      .catch(() => setCats([]));
+  }, []);
+
+  const filteredCats = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [];
+    return cats.filter((cat) => cat.name.includes(q));
+  }, [cats, searchQuery]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -89,14 +97,16 @@ export default function HomePage() {
                   onClick={() => navigate(`/cat/${cat.id}`)}
                   className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition"
                 >
-                  <img
-                    src={cat.image}
-                    alt={cat.name}
-                    className="w-12 h-12 rounded-lg object-cover"
-                  />
+                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                    <span className="text-xl">🐱</span>
+                  </div>
                   <div className="flex-1">
-                    <p className="font-medium">{cat.nickname}</p>
-                    <p className="text-sm text-gray-500">{cat.location.name}</p>
+                    <p className="font-medium">{cat.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {cat.latitude != null && cat.longitude != null
+                        ? `${cat.latitude.toFixed(5)}, ${cat.longitude.toFixed(5)}`
+                        : '暂无定位'}
+                    </p>
                   </div>
                   <MapPin className="h-4 w-4 text-gray-400" />
                 </div>
@@ -110,7 +120,7 @@ export default function HomePage() {
 
       {/* 地图视图 */}
       <div className="flex-1 relative">
-        <MapView />
+        <MapView cats={cats} />
 
         {/* 浮动底部导航 */}
         <div className="absolute bottom-4 left-4 right-4 bg-white rounded-xl shadow-lg p-2 flex justify-around z-[1000]">
