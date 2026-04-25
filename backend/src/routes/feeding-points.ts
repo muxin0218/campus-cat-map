@@ -28,6 +28,7 @@ feedingPointsRouter.get("/", (_req, res) => {
 
     res.status(200).json({ items: rows });
   })().catch(() => {
+    console.error("GET /api/feeding-points failed");
     res.status(500).json({ message: "Internal Server Error" });
   });
 });
@@ -51,6 +52,7 @@ feedingPointsRouter.post("/", (req, res) => {
 
     res.status(201).json(rows[0]);
   })().catch(() => {
+    console.error("POST /api/feeding-points failed");
     res.status(500).json({ message: "Internal Server Error" });
   });
 });

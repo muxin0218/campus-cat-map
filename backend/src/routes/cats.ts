@@ -53,6 +53,7 @@ catsRouter.get("/", (_req, res) => {
 
     res.status(200).json({ items: rows });
   })().catch((err: unknown) => {
+    console.error("GET /api/cats failed:", err);
     res.status(500).json({ message: "Internal Server Error" });
   });
 });
@@ -100,6 +101,7 @@ catsRouter.get("/:id", (req, res) => {
     if (!cat) return res.status(404).json({ message: "Not Found" });
     res.status(200).json(cat);
   })().catch(() => {
+    console.error("GET /api/cats/:id failed");
     res.status(500).json({ message: "Internal Server Error" });
   });
 });
@@ -123,6 +125,7 @@ catsRouter.post("/", (req, res) => {
 
     res.status(201).json(rows[0]);
   })().catch(() => {
+    console.error("POST /api/cats failed");
     res.status(500).json({ message: "Internal Server Error" });
   });
 });

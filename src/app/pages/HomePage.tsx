@@ -11,11 +11,19 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [cats, setCats] = useState<CatListItem[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     void listCats()
-      .then((res) => setCats(res.items))
-      .catch(() => setCats([]));
+      .then((res) => {
+        setCats(res.items);
+        setLoadError(null);
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : '加载失败';
+        setCats([]);
+        setLoadError(message);
+      });
   }, []);
 
   const filteredCats = useMemo(() => {
@@ -87,6 +95,12 @@ export default function HomePage() {
       </header>
 
       {/* 搜索结果列表 (当有搜索时显示) */}
+      {loadError && (
+        <div className="px-4 py-2 bg-red-50 text-red-700 border-b text-sm">
+          加载猫咪数据失败：{loadError}（请直接访问 <span className="font-mono">/api/cats</span> 检查后端）
+        </div>
+      )}
+
       {searchQuery && (
         <div className="px-4 py-2 bg-white border-b max-h-48 overflow-y-auto">
           {filteredCats.length > 0 ? (
