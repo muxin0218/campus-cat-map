@@ -1,59 +1,114 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { ArrowLeft, TrendingUp, Users, Heart, MapPin, Award, Calendar } from 'lucide-react';
-import { mockStats, mockCats, mockCheckIns } from '../data/mockData';
+import { listCats, listSightings } from '../api/client';
+import type { CatListItem, SightingItem } from '../api/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [cats, setCats] = useState<CatListItem[]>([]);
+  const [sightings, setSightings] = useState<SightingItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // 位置投喂频次数据
-  const locationData = [
-    { name: '图书馆', count: 45 },
-    { name: '食堂', count: 38 },
-    { name: '教学楼', count: 28 },
-    { name: '宿舍', count: 22 },
-    { name: '体育馆', count: 15 },
-  ];
+  useEffect(() => {
+    void Promise.all([
+      listCats({ limit: 100 }),
+      listSightings({ limit: 200 })
+    ])
+      .then(([catsRes, sightingsRes]) => {
+        setCats(catsRes.items);
+        setSightings(sightingsRes.items);
+      })
+      .catch(() => {
+        setCats([]);
+        setSightings([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   // 猫咪性别分布
+  const maleCount = cats.filter((c) => c.sex === 'male').length;
+  const femaleCount = cats.filter((c) => c.sex === 'female').length;
+  const unknownSexCount = cats.filter((c) => c.sex === 'unknown').length;
+
   const genderData = [
-    { name: '公猫', value: 3, color: '#667eea' },
-    { name: '母猫', value: 2, color: '#f093fb' },
+    { name: '公猫', value: maleCount || 1, color: '#667eea' },
+    { name: '母猫', value: femaleCount || 1, color: '#f093fb' },
   ];
+  if (unknownSexCount > 0) {
+    genderData.push({ name: '未知', value: unknownSexCount, color: '#94a3b8' });
+  }
 
   // 绝育状态
+  const neuteredCount = cats.filter((c) => c.neutered).length;
+  const notNeuteredCount = cats.length - neuteredCount;
+
   const neuteredData = [
-    { name: '已绝育', value: 4, color: '#4ade80' },
-    { name: '未绝育', value: 1, color: '#fb923c' },
+    { name: '已绝育', value: neuteredCount || 1, color: '#4ade80' },
+    { name: '未绝育', value: notNeuteredCount || 1, color: '#fb923c' },
   ];
 
-  // 每周打卡趋势
-  const weeklyData = [
-    { day: '周一', count: 12 },
-    { day: '周二', count: 19 },
-    { day: '周三', count: 15 },
-    { day: '周四', count: 22 },
-    { day: '周五', count: 28 },
-    { day: '周六', count: 35 },
-    { day: '周日', count: 30 },
-  ];
+  // 每周打卡趋势（从 sightings 数据计算）
+  const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+  const now = new Date();
+  for (const s of sightings) {
+    const d = new Date(s.happened_at);
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays >= 0 && diffDays < 7) {
+      dayCounts[d.getDay()]++;
+    }
+  }
+  const weeklyData = dayNames.map((day, i) => ({
+    day,
+    count: dayCounts[i]
+  }));
 
-  // 明星猫咪排行
-  const topCats = [
-    { name: '小橘', checkIns: 45, image: mockCats[0].image },
-    { name: '奶牛', checkIns: 38, image: mockCats[2].image },
-    { name: '雪球', checkIns: 28, image: mockCats[3].image },
-  ];
+  // 各点位投喂频次（从 sightings 数据按经纬度聚类）
+  const locationGroups = new Map<string, { lat: number; lng: number; count: number }>();
+  for (const s of sightings) {
+    const key = `${s.latitude.toFixed(4)},${s.longitude.toFixed(4)}`;
+    const existing = locationGroups.get(key);
+    if (existing) {
+      existing.count++;
+    } else {
+      locationGroups.set(key, { lat: s.latitude, lng: s.longitude, count: 1 });
+    }
+  }
+  const locationData = Array.from(locationGroups.entries())
+    .map(([key, val]) => ({
+      name: key,
+      count: val.count
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
-  // 活跃用户排行
-  const topUsers = [
-    { name: '张三', count: 25, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
-    { name: '李四', count: 18, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lucy' },
-    { name: '王五', count: 15, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Max' },
-  ];
+  // 明星猫咪排行（按 sightings 数量）
+  const catSightingCount = new Map<number, number>();
+  for (const s of sightings) {
+    catSightingCount.set(s.cat_id, (catSightingCount.get(s.cat_id) ?? 0) + 1);
+  }
+  const topCats = cats
+    .map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      checkIns: catSightingCount.get(cat.id) ?? 0,
+      photo_url: cat.photo_url
+    }))
+    .sort((a, b) => b.checkIns - a.checkIns)
+    .slice(0, 3);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
@@ -82,8 +137,8 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-medium opacity-90">校园流浪猫</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{mockStats.totalCats}</p>
-              <p className="text-xs opacity-75 mt-1">活跃: {mockStats.activeCats} 只</p>
+              <p className="text-3xl font-bold">{cats.length}</p>
+              <p className="text-xs opacity-75 mt-1">已记录 {cats.length} 只</p>
             </CardContent>
           </Card>
 
@@ -92,8 +147,8 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-medium opacity-90">总打卡数</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{mockStats.totalCheckIns}</p>
-              <p className="text-xs opacity-75 mt-1">本月新增: 86</p>
+              <p className="text-3xl font-bold">{sightings.length}</p>
+              <p className="text-xs opacity-75 mt-1">累计记录</p>
             </CardContent>
           </Card>
 
@@ -102,18 +157,20 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-medium opacity-90">投喂记录</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{mockStats.totalFeedings}</p>
-              <p className="text-xs opacity-75 mt-1">今日: 12 次</p>
+              <p className="text-3xl font-bold">
+                {sightings.filter((s) => s.note?.includes('[feeding]')).length}
+              </p>
+              <p className="text-xs opacity-75 mt-1">含投喂标记</p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-blue-500 to-indigo-500 text-white border-0">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium opacity-90">参与用户</CardTitle>
+              <CardTitle className="text-sm font-medium opacity-90">出现点位</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">156</p>
-              <p className="text-xs opacity-75 mt-1">活跃: 89 人</p>
+              <p className="text-3xl font-bold">{locationGroups.size}</p>
+              <p className="text-xs opacity-75 mt-1">不同位置</p>
             </CardContent>
           </Card>
         </div>
@@ -123,7 +180,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Calendar className="h-4 w-4 text-purple-600" />
-              每周打卡趋势
+              近 7 天打卡趋势
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -150,14 +207,14 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <MapPin className="h-4 w-4 text-purple-600" />
-              各点位投喂频次
+              各点位打卡频次
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={locationData}>
+              <BarChart data={locationData.length > 0 ? locationData : [{ name: '暂无数据', count: 1 }]}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Bar dataKey="count" fill="url(#colorGradient)" radius={[8, 8, 0, 0]} />
@@ -237,17 +294,16 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {topCats.map((cat, index) => (
-                <div key={cat.name} className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                    index === 0 ? 'bg-yellow-500' :
-                    index === 1 ? 'bg-gray-400' :
-                    'bg-orange-600'
-                  }`}>
+              {topCats.length > 0 ? topCats.map((cat, index) => (
+                <div key={cat.id} className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${index === 0 ? 'bg-yellow-500' :
+                      index === 1 ? 'bg-gray-400' :
+                        'bg-orange-600'
+                    }`}>
                     {index + 1}
                   </div>
                   <img
-                    src={cat.image}
+                    src={cat.photo_url ?? 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=400'}
                     alt={cat.name}
                     className="w-12 h-12 rounded-lg object-cover"
                   />
@@ -257,12 +313,14 @@ export default function DashboardPage() {
                   </div>
                   {index === 0 && <span className="text-2xl">👑</span>}
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm text-gray-500 text-center py-4">暂无数据</p>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* 活跃用户榜 */}
+        {/* 活跃用户榜（从 sightings 无法获取用户信息，显示提示） */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -271,31 +329,9 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {topUsers.map((user, index) => (
-                <div key={user.name} className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                    index === 0 ? 'bg-purple-500' :
-                    index === 1 ? 'bg-pink-500' :
-                    'bg-indigo-500'
-                  }`}>
-                    {index + 1}
-                  </div>
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    className="w-12 h-12 rounded-full"
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium">{user.name}</p>
-                    <p className="text-xs text-gray-500">{user.count} 次贡献</p>
-                  </div>
-                  <Badge variant="secondary">
-                    爱心使者
-                  </Badge>
-                </div>
-              ))}
-            </div>
+            <p className="text-sm text-gray-500 text-center py-4">
+              用户排行榜功能需要完善用户系统后启用
+            </p>
           </CardContent>
         </Card>
       </div>

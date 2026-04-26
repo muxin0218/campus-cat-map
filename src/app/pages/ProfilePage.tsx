@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { mockUser, mockCheckIns, mockCats } from '../data/mockData';
+import { listCats, listSightings } from '../api/client';
+import type { CatListItem, SightingItem } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
@@ -7,8 +9,60 @@ import { ArrowLeft, Camera, Heart, Star, Settings, Award, TrendingUp, MapPin } f
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const userCheckIns = mockCheckIns.filter(c => c.userId === mockUser.id);
-  const favoriteCats = mockCats.filter(c => mockUser.favorites.includes(c.id));
+  const [cats, setCats] = useState<CatListItem[]>([]);
+  const [sightings, setSightings] = useState<SightingItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    void Promise.all([
+      listCats({ limit: 100 }),
+      listSightings({ limit: 50 })
+    ])
+      .then(([catsRes, sightingsRes]) => {
+        setCats(catsRes.items);
+        setSightings(sightingsRes.items);
+      })
+      .catch(() => {
+        setCats([]);
+        setSightings([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // 从 sightings 中提取打卡记录（按猫咪分组）
+  const catSightingMap = new Map<number, SightingItem[]>();
+  for (const s of sightings) {
+    const list = catSightingMap.get(s.cat_id) ?? [];
+    list.push(s);
+    catSightingMap.set(s.cat_id, list);
+  }
+
+  const catMap = new Map<number, CatListItem>();
+  for (const c of cats) {
+    catMap.set(c.id, c);
+  }
+
+  // 最近打卡记录
+  const recentRecords = sightings.slice(0, 5).map((s) => {
+    const cat = catMap.get(s.cat_id);
+    return {
+      id: s.id,
+      catId: s.cat_id,
+      catName: cat?.name ?? `猫咪 #${s.cat_id}`,
+      type: s.note?.includes('[feeding]') ? 'feeding' as const : 'encounter' as const,
+      comment: s.note ?? '',
+      timestamp: new Date(s.happened_at).toLocaleString(),
+      image: cat?.photo_url ?? 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=400'
+    };
+  });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,14 +90,14 @@ export default function ProfilePage() {
         {/* 用户信息 */}
         <div className="px-4 pb-6 flex items-center gap-4">
           <img
-            src={mockUser.avatar}
-            alt={mockUser.name}
+            src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
+            alt="用户头像"
             className="w-20 h-20 rounded-full border-4 border-white shadow-lg"
           />
           <div className="flex-1">
-            <h2 className="text-xl font-bold mb-1">{mockUser.name}</h2>
+            <h2 className="text-xl font-bold mb-1">访客用户</h2>
             <Badge className="bg-white/20 text-white border-white/30">
-              {mockUser.role === 'admin' ? '管理员' : '普通用户'}
+              普通用户
             </Badge>
           </div>
         </div>
@@ -57,22 +111,24 @@ export default function ProfilePage() {
               <div className="flex items-center justify-center mb-2">
                 <Camera className="h-5 w-5 text-purple-600" />
               </div>
-              <p className="text-2xl font-bold text-purple-600">{mockUser.checkInCount}</p>
+              <p className="text-2xl font-bold text-purple-600">{sightings.length}</p>
               <p className="text-xs text-gray-500">打卡次数</p>
             </div>
             <div>
               <div className="flex items-center justify-center mb-2">
                 <Heart className="h-5 w-5 text-red-600" />
               </div>
-              <p className="text-2xl font-bold text-red-600">{mockUser.feedingCount}</p>
+              <p className="text-2xl font-bold text-red-600">
+                {sightings.filter((s) => s.note?.includes('[feeding]')).length}
+              </p>
               <p className="text-xs text-gray-500">投喂次数</p>
             </div>
             <div>
               <div className="flex items-center justify-center mb-2">
                 <Star className="h-5 w-5 text-orange-600" />
               </div>
-              <p className="text-2xl font-bold text-orange-600">{mockUser.favorites.length}</p>
-              <p className="text-xs text-gray-500">收藏猫咪</p>
+              <p className="text-2xl font-bold text-orange-600">{cats.length}</p>
+              <p className="text-xs text-gray-500">猫咪总数</p>
             </div>
           </div>
         </div>
@@ -124,32 +180,37 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold flex items-center gap-2">
             <Star className="h-5 w-5 text-orange-600" />
-            我的收藏
+            猫咪列表
           </h3>
           <Button variant="ghost" size="sm" className="text-purple-600">
             查看全部
           </Button>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          {favoriteCats.map(cat => (
+          {cats.slice(0, 6).map((cat) => (
             <div
               key={cat.id}
               onClick={() => navigate(`/cat/${cat.id}`)}
               className="cursor-pointer"
             >
               <img
-                src={cat.image}
+                src={cat.photo_url ?? 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=400'}
                 alt={cat.name}
                 className="w-full aspect-square object-cover rounded-lg mb-1"
               />
-              <p className="text-xs font-medium truncate">{cat.nickname}</p>
+              <p className="text-xs font-medium truncate">{cat.name}</p>
               <p className="text-xs text-gray-500 truncate flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
-                {cat.location.name}
+                {cat.latitude != null && cat.longitude != null
+                  ? `${cat.latitude.toFixed(4)}, ${cat.longitude.toFixed(4)}`
+                  : '暂无定位'}
               </p>
             </div>
           ))}
         </div>
+        {cats.length === 0 && (
+          <p className="text-sm text-gray-500 text-center py-4">暂无猫咪数据</p>
+        )}
       </div>
 
       <Separator />
@@ -166,7 +227,7 @@ export default function ProfilePage() {
           </Button>
         </div>
         <div className="space-y-3">
-          {userCheckIns.slice(0, 3).map(record => (
+          {recentRecords.map((record) => (
             <div key={record.id} className="flex gap-3">
               <img
                 src={record.image}
@@ -180,11 +241,14 @@ export default function ProfilePage() {
                     {record.type === 'feeding' ? '投喂' : '偶遇'}
                   </Badge>
                 </div>
-                <p className="text-sm text-gray-600 mb-1">{record.comment}</p>
+                <p className="text-sm text-gray-600 mb-1">{record.comment || '（无备注）'}</p>
                 <p className="text-xs text-gray-400">{record.timestamp}</p>
               </div>
             </div>
           ))}
+          {recentRecords.length === 0 && (
+            <p className="text-sm text-gray-500 text-center py-4">暂无打卡记录</p>
+          )}
         </div>
       </div>
 

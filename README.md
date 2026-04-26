@@ -2,7 +2,6 @@
 
 一个用于在校园地图上标注流浪猫档案、出现记录与投喂点的 Web 应用。
 
-（原型来源：Figma 设计稿：`https://www.figma.com/design/O22Nw44jSzqvB7em40FXBW/%E6%A0%A1%E5%9B%AD%E6%B5%81%E6%B5%AA%E7%8C%AB%E5%9C%B0%E5%9B%BE%E8%AE%BE%E8%AE%A1`）
 
 ## 技术栈
 

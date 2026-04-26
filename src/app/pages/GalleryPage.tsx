@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { mockCats } from '../data/mockData';
+import { listCats } from '../api/client';
+import type { CatListItem } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
@@ -10,18 +11,39 @@ export default function GalleryPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'neutered' | 'friendly'>('all');
+  const [cats, setCats] = useState<CatListItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredCats = mockCats.filter(cat => {
-    const matchSearch = cat.name.includes(searchQuery) ||
-      cat.nickname.includes(searchQuery) ||
-      cat.color.includes(searchQuery);
+  useEffect(() => {
+    void listCats()
+      .then((res) => setCats(res.items))
+      .catch(() => setCats([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredCats = cats.filter((cat) => {
+    const matchSearch = cat.name.includes(searchQuery);
 
     if (!matchSearch) return false;
 
     if (filter === 'neutered') return cat.neutered;
-    if (filter === 'friendly') return cat.personality.includes('亲人');
+    if (filter === 'friendly') return cat.description?.includes('亲人') ?? false;
     return true;
   });
+
+  const sexLabel = (sex: string) => {
+    if (sex === 'male') return '公';
+    if (sex === 'female') return '母';
+    return '未知';
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500">加载中...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,7 +80,7 @@ export default function GalleryPage() {
               onClick={() => setFilter('all')}
               className={filter === 'all' ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
-              全部 ({mockCats.length})
+              全部 ({cats.length})
             </Button>
             <Button
               variant={filter === 'neutered' ? 'default' : 'outline'}
@@ -66,7 +88,7 @@ export default function GalleryPage() {
               onClick={() => setFilter('neutered')}
               className={filter === 'neutered' ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
-              已绝育 ({mockCats.filter(c => c.neutered).length})
+              已绝育 ({cats.filter((c) => c.neutered).length})
             </Button>
             <Button
               variant={filter === 'friendly' ? 'default' : 'outline'}
@@ -74,7 +96,7 @@ export default function GalleryPage() {
               onClick={() => setFilter('friendly')}
               className={filter === 'friendly' ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
-              亲人 ({mockCats.filter(c => c.personality.includes('亲人')).length})
+              亲人 ({cats.filter((c) => c.description?.includes('亲人')).length})
             </Button>
           </div>
         </div>
@@ -83,7 +105,7 @@ export default function GalleryPage() {
       {/* 猫咪卡片网格 */}
       <div className="p-4">
         <div className="grid grid-cols-2 gap-4">
-          {filteredCats.map(cat => (
+          {filteredCats.map((cat) => (
             <div
               key={cat.id}
               onClick={() => navigate(`/cat/${cat.id}`)}
@@ -92,33 +114,24 @@ export default function GalleryPage() {
               {/* 图片 */}
               <div className="relative">
                 <img
-                  src={cat.image}
+                  src={cat.photo_url ?? 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=400'}
                   alt={cat.name}
                   className="w-full h-40 object-cover"
                 />
                 <div className="absolute top-2 right-2">
                   <Badge className="bg-white/90 text-gray-800 border-0">
-                    {cat.gender}
+                    {sexLabel(cat.sex)}
                   </Badge>
                 </div>
               </div>
 
               {/* 信息 */}
               <div className="p-3">
-                <h3 className="font-semibold mb-1 truncate">{cat.nickname}</h3>
-                <p className="text-xs text-gray-500 mb-2">{cat.color}</p>
+                <h3 className="font-semibold mb-1 truncate">{cat.name}</h3>
+                <p className="text-xs text-gray-500 mb-2">{cat.description ?? '暂无描述'}</p>
 
                 {/* 标签 */}
                 <div className="flex flex-wrap gap-1 mb-2">
-                  {cat.personality.slice(0, 2).map(tag => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
-                      className="text-xs bg-purple-100 text-purple-700"
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
                   {cat.neutered && (
                     <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
                       已绝育
@@ -129,7 +142,11 @@ export default function GalleryPage() {
                 {/* 位置 */}
                 <div className="flex items-center gap-1 text-xs text-gray-500">
                   <MapPin className="h-3 w-3" />
-                  <span className="truncate">{cat.location.name}</span>
+                  <span className="truncate">
+                    {cat.latitude != null && cat.longitude != null
+                      ? `${cat.latitude.toFixed(5)}, ${cat.longitude.toFixed(5)}`
+                      : '暂无定位'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -147,18 +164,18 @@ export default function GalleryPage() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <p className="text-2xl font-bold text-purple-600">{mockCats.length}</p>
+            <p className="text-2xl font-bold text-purple-600">{cats.length}</p>
             <p className="text-xs text-gray-500">总猫咪数</p>
           </div>
           <div>
             <p className="text-2xl font-bold text-green-600">
-              {mockCats.filter(c => c.neutered).length}
+              {cats.filter((c) => c.neutered).length}
             </p>
             <p className="text-xs text-gray-500">已绝育</p>
           </div>
           <div>
             <p className="text-2xl font-bold text-orange-600">
-              {mockCats.filter(c => c.personality.includes('亲人')).length}
+              {cats.filter((c) => c.description?.includes('亲人')).length}
             </p>
             <p className="text-xs text-gray-500">性格亲人</p>
           </div>
