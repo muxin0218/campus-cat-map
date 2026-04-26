@@ -13,15 +13,17 @@
 
 ## 启动步骤
 
-### 1) 数据库配置（含 SQL 导入）
+### 1) 数据库配置
 
 1. 准备 PostgreSQL `14+`，并创建数据库：`campus_cat_map`
 2. 导入建表脚本：
    - `psql -U postgres -d campus_cat_map -f db/schema.postgres.sql`
+3. 导入种子数据：
+   - `psql -U postgres -d campus_cat_map -f db/seed.postgres.sql`
 
 ### 2) 后端运行命令
 
-1. 安装依赖（根目录执行一次即可）：
+1. 安装依赖：
    - `pnpm install`
 2. 配置环境变量：
    - 复制 backend/.env.example 为 backend/.env，并根据本机 PostgreSQL 的实际安装情况修改数据库连接信息。
