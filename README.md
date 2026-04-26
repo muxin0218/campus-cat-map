@@ -24,7 +24,7 @@
 1. 安装依赖（根目录执行一次即可）：
    - `pnpm install`
 2. 配置环境变量：
-   - 复制 `backend/.env.example` 为 `backend/.env`，并按本机 MySQL 修改
+   - 按本机PostgreSQL修改`backend/.env`
 3. 启动后端：
    - `pnpm --dir backend dev`
 4. 本地接口地址：
