@@ -2,7 +2,6 @@
 
 一个用于在校园地图上标注流浪猫档案、出现记录与投喂点的 Web 应用。
 
-
 ## 技术栈
 
 - 前端：Vite `6.3.5` + React `18.3.1` + React Router `7.13.0` + Leaflet `^1.9.4` / React-Leaflet `^5.0.0` + Tailwind CSS `4.1.12`
