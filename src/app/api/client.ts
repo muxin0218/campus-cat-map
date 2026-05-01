@@ -142,6 +142,29 @@ export async function deleteFeedingPoint(id: number) {
   await fetch(`${apiBaseUrl}/api/feeding-points/${id}`, { method: "DELETE" });
 }
 
+export async function createFeedingEvent(input: {
+  feeding_point_id: number;
+  feeder_id?: number;
+  food_type?: string;
+  amount?: string;
+  note?: string;
+  fed_at?: string;
+}) {
+  return requestJson<{
+    id: number;
+    feeding_point_id: number;
+    feeder_id: number | null;
+    food_type: string | null;
+    amount: string | null;
+    note: string | null;
+    fed_at: string;
+    created_at: string;
+  }>("/api/feeding-events", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
 export async function createSighting(input: {
   cat_id: number;
   latitude: number;

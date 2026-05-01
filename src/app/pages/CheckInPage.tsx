@@ -1,34 +1,55 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { ArrowLeft, Camera, Info, MapPin, Upload } from "lucide-react";
+import { ArrowLeft, Camera, Info, MapPin, Upload, UtensilsCrossed } from "lucide-react";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import { createSighting, listCats, getStoredUser, type CatListItem } from "../api/client";
+import {
+  createSighting,
+  createFeedingEvent,
+  listCats,
+  listFeedingPoints,
+  getStoredUser,
+  isLoggedIn,
+  type CatListItem,
+  type FeedingPointItem
+} from "../api/client";
 
 export default function CheckInPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const type = searchParams.get("type") || "encounter";
+  const isFeeding = type === "feeding";
 
+  // 偶遇打卡用
   const [cats, setCats] = useState<CatListItem[]>([]);
   const [selectedCat, setSelectedCat] = useState<string>("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [comment, setComment] = useState("");
-  const [image, setImage] = useState<string | null>(null);
+
+  // 投喂打卡用
+  const [feedingPoints, setFeedingPoints] = useState<FeedingPointItem[]>([]);
+  const [selectedPoint, setSelectedPoint] = useState<string>("");
   const [foodType, setFoodType] = useState("");
   const [amount, setAmount] = useState("");
+
+  // 公共
+  const [image, setImage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const showTip = type === "feeding";
-
   useEffect(() => {
-    void listCats()
-      .then((res) => setCats(res.items))
-      .catch(() => setCats([]));
-  }, []);
+    if (isFeeding) {
+      void listFeedingPoints()
+        .then((res) => setFeedingPoints(res.items))
+        .catch(() => setFeedingPoints([]));
+    } else {
+      void listCats()
+        .then((res) => setCats(res.items))
+        .catch(() => setCats([]));
+    }
+  }, [isFeeding]);
 
   const locationText = useMemo(() => {
     if (!coords) return "";
@@ -56,44 +77,66 @@ export default function CheckInPage() {
   };
 
   const handleSubmit = async () => {
-    const catId = Number(selectedCat);
-    if (!Number.isFinite(catId) || catId <= 0) {
-      alert("请选择猫咪");
-      return;
-    }
-    if (!coords) {
-      alert("请先获取定位");
-      return;
-    }
-    if (!image) {
-      alert("请上传照片（当前版本仅用于演示，不会保存到数据库）");
+    if (!isLoggedIn()) {
+      alert("请先登录后再打卡");
+      navigate("/login");
       return;
     }
 
-    const noteParts: string[] = [];
-    noteParts.push(type === "feeding" ? "[feeding]" : "[encounter]");
-    if (type === "feeding") {
-      if (foodType.trim()) noteParts.push(`food=${foodType.trim()}`);
-      if (amount.trim()) noteParts.push(`amount=${amount.trim()}`);
-    }
-    if (comment.trim()) noteParts.push(comment.trim());
+    if (isFeeding) {
+      // ─── 投喂打卡 ───
+      const pointId = Number(selectedPoint);
+      if (!Number.isFinite(pointId) || pointId <= 0) {
+        alert("请选择投喂点");
+        return;
+      }
 
-    setSubmitting(true);
-    try {
       const user = getStoredUser();
-      await createSighting({
-        cat_id: catId,
-        latitude: coords.lat,
-        longitude: coords.lng,
-        note: noteParts.join(" "),
-        reporter_id: user?.id
-      });
-      alert("打卡成功（已写入数据库 sightings）");
-      navigate(-1);
-    } catch (e: any) {
-      alert(`提交失败：${e?.message ?? "unknown error"}`);
-    } finally {
-      setSubmitting(false);
+      setSubmitting(true);
+      try {
+        await createFeedingEvent({
+          feeding_point_id: pointId,
+          feeder_id: user?.id,
+          food_type: foodType.trim() || undefined,
+          amount: amount.trim() || undefined,
+          note: comment.trim() || undefined
+        });
+        alert("投喂打卡成功！");
+        navigate(-1);
+      } catch (e: any) {
+        alert(`提交失败：${e?.message ?? "unknown error"}`);
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      // ─── 偶遇打卡 ───
+      const catId = Number(selectedCat);
+      if (!Number.isFinite(catId) || catId <= 0) {
+        alert("请选择猫咪");
+        return;
+      }
+      if (!coords) {
+        alert("请先获取定位");
+        return;
+      }
+
+      const user = getStoredUser();
+      setSubmitting(true);
+      try {
+        await createSighting({
+          cat_id: catId,
+          latitude: coords.lat,
+          longitude: coords.lng,
+          note: comment.trim() || undefined,
+          reporter_id: user?.id
+        });
+        alert("偶遇打卡成功！");
+        navigate(-1);
+      } catch (e: any) {
+        alert(`提交失败：${e?.message ?? "unknown error"}`);
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -104,12 +147,20 @@ export default function CheckInPage() {
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-lg font-semibold">{type === "feeding" ? "投喂打卡" : "偶遇打卡"}</h1>
+          <h1 className="text-lg font-semibold">{isFeeding ? "投喂打卡" : "偶遇打卡"}</h1>
         </div>
       </header>
 
       <div className="p-4 space-y-4">
-        {showTip && (
+        {/* 未登录提示 */}
+        {!isLoggedIn() && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-700">
+            请先<button onClick={() => navigate("/login")} className="text-orange-600 underline font-medium">登录</button>后再打卡
+          </div>
+        )}
+
+        {/* 投喂小贴士 */}
+        {isFeeding && (
           <Alert className="bg-orange-50 border-orange-200">
             <Info className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-orange-800">
@@ -118,71 +169,88 @@ export default function CheckInPage() {
           </Alert>
         )}
 
-        <div className="bg-white rounded-lg p-4">
-          <Label className="mb-2 block">拍照上传 *</Label>
-          {image ? (
-            <div className="relative">
-              <img src={image} alt="upload" className="w-full h-64 object-cover rounded-lg" />
-              <Button variant="destructive" size="sm" onClick={() => setImage(null)} className="absolute top-2 right-2">
-                删除
-              </Button>
-            </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition">
-              <Camera className="h-12 w-12 text-gray-400 mb-2" />
-              <p className="text-sm text-gray-500 mb-1">点击拍照或上传图片</p>
-              <p className="text-xs text-gray-400">当前版本仅用于演示（不保存图片）</p>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </label>
-          )}
-        </div>
-
-        <div className="bg-white rounded-lg p-4">
-          <Label className="mb-2 block">选择猫咪 *</Label>
-          <select
-            value={selectedCat}
-            onChange={(e) => setSelectedCat(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-          >
-            <option value="">请选择猫咪</option>
-            {cats.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="bg-white rounded-lg p-4">
-          <Label className="mb-2 block">位置信息 *</Label>
-          <div className="flex gap-2">
-            <Input placeholder="点击获取当前定位" value={locationText} readOnly className="flex-1" />
-            <Button onClick={handleGetLocation} variant="outline" className="shrink-0">
-              <MapPin className="h-4 w-4 mr-1" />
-              定位
-            </Button>
-          </div>
-        </div>
-
-        {type === "feeding" && (
+        {/* 选择投喂点（投喂打卡） */}
+        {isFeeding && (
           <div className="bg-white rounded-lg p-4">
-            <Label className="mb-2 block">投喂内容</Label>
-            <Input placeholder="例如：猫粮" className="mb-2" value={foodType} onChange={(e) => setFoodType(e.target.value)} />
-            <Label className="mb-2 block">投喂量</Label>
-            <Input placeholder="例如：约 50g" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <Label className="mb-2 block flex items-center gap-1">
+              <UtensilsCrossed className="h-4 w-4 text-orange-500" />
+              选择投喂点 *
+            </Label>
+            <select
+              value={selectedPoint}
+              onChange={(e) => setSelectedPoint(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="">请选择投喂点</option>
+              {feedingPoints.map((fp) => (
+                <option key={fp.id} value={fp.id}>
+                  🍽️ {fp.name}
+                </option>
+              ))}
+            </select>
+            {feedingPoints.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                暂无投喂点，
+                <button onClick={() => navigate("/feeding-points")} className="text-orange-600 underline">
+                  去添加
+                </button>
+              </p>
+            )}
           </div>
         )}
 
+        {/* 选择猫咪（偶遇打卡） */}
+        {!isFeeding && (
+          <div className="bg-white rounded-lg p-4">
+            <Label className="mb-2 block">选择猫咪 *</Label>
+            <select
+              value={selectedCat}
+              onChange={(e) => setSelectedCat(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+            >
+              <option value="">请选择猫咪</option>
+              {cats.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  🐱 {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* 定位（仅偶遇打卡需要） */}
+        {!isFeeding && (
+          <div className="bg-white rounded-lg p-4">
+            <Label className="mb-2 block">位置信息 *</Label>
+            <div className="flex gap-2">
+              <Input placeholder="点击获取当前定位" value={locationText} readOnly className="flex-1" />
+              <Button onClick={handleGetLocation} variant="outline" className="shrink-0">
+                <MapPin className="h-4 w-4 mr-1" />
+                定位
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 投喂内容（投喂打卡） */}
+        {isFeeding && (
+          <div className="bg-white rounded-lg p-4 space-y-3">
+            <div>
+              <Label className="mb-2 block">食物类型</Label>
+              <Input placeholder="例如：猫粮、罐头" value={foodType} onChange={(e) => setFoodType(e.target.value)} />
+            </div>
+            <div>
+              <Label className="mb-2 block">投喂量</Label>
+              <Input placeholder="例如：约 50g" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {/* 备注说明 */}
         <div className="bg-white rounded-lg p-4">
           <Label className="mb-2 block">备注说明</Label>
           <Textarea
-            placeholder={type === "feeding" ? "分享投喂时的趣事..." : "记录偶遇的瞬间..."}
+            placeholder={isFeeding ? "分享投喂时的趣事..." : "记录偶遇的瞬间..."}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             rows={4}
@@ -195,8 +263,11 @@ export default function CheckInPage() {
           </Button>
           <Button
             onClick={handleSubmit}
-            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             disabled={submitting}
+            className={`flex-1 ${isFeeding
+              ? "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+              : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              }`}
           >
             <Upload className="h-4 w-4 mr-2" />
             {submitting ? "提交中..." : "提交打卡"}
@@ -206,4 +277,3 @@ export default function CheckInPage() {
     </div>
   );
 }
-

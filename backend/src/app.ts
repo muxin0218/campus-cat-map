@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { catsRouter } from "./routes/cats.js";
 import { feedingPointsRouter } from "./routes/feeding-points.js";
+import { feedingEventsRouter } from "./routes/feeding-events.js";
 import { healthRouter } from "./routes/health.js";
 import { sightingsRouter } from "./routes/sightings.js";
 
@@ -15,6 +16,7 @@ export function createApp() {
   app.use("/api/cats", catsRouter);
   app.use("/api/sightings", sightingsRouter);
   app.use("/api/feeding-points", feedingPointsRouter);
+  app.use("/api/feeding-events", feedingEventsRouter);
 
   return app;
 }
