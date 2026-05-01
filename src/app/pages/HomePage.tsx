@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import MapView from '../components/MapView';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { MapPin, Search, Camera, Heart, User, UtensilsCrossed } from 'lucide-react';
+import { MapPin, Search, Camera, Heart, TrendingUp, User, UtensilsCrossed } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { listCats, listFeedingPoints, getStoredUser, isLoggedIn } from '../api/client';
 import type { CatListItem, FeedingPointItem, UserInfo } from '../api/client';
@@ -192,6 +192,14 @@ export default function HomePage() {
           >
             <UtensilsCrossed className="h-5 w-5 text-orange-500" />
             <span className="text-xs text-orange-500">投喂点</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className="flex-1 flex flex-col items-center gap-1 h-auto py-2"
+            onClick={() => navigate('/dashboard')}
+          >
+            <TrendingUp className="h-5 w-5 text-green-600" />
+            <span className="text-xs text-green-600 font-medium">统计</span>
           </Button>
           <Button
             variant="ghost"

@@ -32,6 +32,7 @@ export default function CheckInPage() {
   // 投喂打卡用
   const [feedingPoints, setFeedingPoints] = useState<FeedingPointItem[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<string>("");
+  const [selectedFeedingCat, setSelectedFeedingCat] = useState<string>("");
   const [foodType, setFoodType] = useState("");
   const [amount, setAmount] = useState("");
 
@@ -41,9 +42,18 @@ export default function CheckInPage() {
 
   useEffect(() => {
     if (isFeeding) {
-      void listFeedingPoints()
-        .then((res) => setFeedingPoints(res.items))
-        .catch(() => setFeedingPoints([]));
+      void Promise.all([
+        listFeedingPoints(),
+        listCats()
+      ])
+        .then(([fpRes, catsRes]) => {
+          setFeedingPoints(fpRes.items);
+          setCats(catsRes.items);
+        })
+        .catch(() => {
+          setFeedingPoints([]);
+          setCats([]);
+        });
     } else {
       void listCats()
         .then((res) => setCats(res.items))
@@ -96,6 +106,7 @@ export default function CheckInPage() {
       try {
         await createFeedingEvent({
           feeding_point_id: pointId,
+          cat_id: selectedFeedingCat ? Number(selectedFeedingCat) : undefined,
           feeder_id: user?.id,
           food_type: foodType.trim() || undefined,
           amount: amount.trim() || undefined,
@@ -244,6 +255,25 @@ export default function CheckInPage() {
               <Label className="mb-2 block">投喂量</Label>
               <Input placeholder="例如：约 50g" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
+          </div>
+        )}
+
+        {/* 关联猫咪（仅投喂打卡） */}
+        {isFeeding && (
+          <div className="bg-white rounded-lg p-4">
+            <Label className="mb-2 block">关联猫咪（可选）</Label>
+            <select
+              value={selectedFeedingCat}
+              onChange={(e) => setSelectedFeedingCat(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="">不关联猫咪</option>
+              {cats.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  🐱 {cat.name}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 

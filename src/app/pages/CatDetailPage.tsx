@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Camera, Heart, MapPin, MessageCircle, Share2, ThumbsUp } from "lucide-react";
+import { ArrowLeft, Camera, Heart, MapPin, MessageCircle, Share2, ThumbsUp, UtensilsCrossed } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { Textarea } from "../components/ui/textarea";
-import { getCat, listSightings, type CatListItem, type SightingItem } from "../api/client";
+import { getCat, listSightings, listFeedingEvents, type CatListItem, type SightingItem, type FeedingEventItem } from "../api/client";
 
 export default function CatDetailPage() {
   const { id } = useParams();
@@ -14,6 +14,7 @@ export default function CatDetailPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [cat, setCat] = useState<CatListItem | null>(null);
   const [records, setRecords] = useState<SightingItem[]>([]);
+  const [feedingRecords, setFeedingRecords] = useState<FeedingEventItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const catId = useMemo(() => Number(id), [id]);
@@ -26,17 +27,63 @@ export default function CatDetailPage() {
     }
 
     setLoading(true);
-    void Promise.all([getCat(catId), listSightings({ cat_id: catId, limit: 50 })])
-      .then(([catRes, sightingsRes]) => {
+    void Promise.all([
+      getCat(catId),
+      listSightings({ cat_id: catId, limit: 50 }),
+      listFeedingEvents({ cat_id: catId, limit: 50 })
+    ])
+      .then(([catRes, sightingsRes, feedingRes]) => {
         setCat(catRes);
         setRecords(sightingsRes.items);
+        setFeedingRecords(feedingRes.items);
       })
       .catch(() => {
         setCat(null);
         setRecords([]);
+        setFeedingRecords([]);
       })
       .finally(() => setLoading(false));
   }, [catId]);
+
+  // 合并所有记录，按时间排序
+  const allRecords = useMemo(() => {
+    const items: Array<{
+      type: "sighting" | "feeding";
+      id: number;
+      time: string;
+      username: string | null;
+      note: string | null;
+      photo_url: string | null;
+      detail: string;
+    }> = [];
+
+    for (const r of records) {
+      items.push({
+        type: "sighting",
+        id: r.id,
+        time: r.happened_at,
+        username: r.reporter_username,
+        note: r.note,
+        photo_url: r.photo_url,
+        detail: `📍 ${r.latitude.toFixed(5)}, ${r.longitude.toFixed(5)}`
+      });
+    }
+
+    for (const f of feedingRecords) {
+      items.push({
+        type: "feeding",
+        id: f.id,
+        time: f.fed_at,
+        username: f.feeder_username,
+        note: f.note,
+        photo_url: null,
+        detail: `🍽️ ${f.feeding_point_name ?? "投喂点"}${f.food_type ? ` · ${f.food_type}` : ""}${f.amount ? ` · ${f.amount}` : ""}`
+      });
+    }
+
+    items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+    return items;
+  }, [records, feedingRecords]);
 
   if (loading) {
     return (
@@ -151,9 +198,9 @@ export default function CatDetailPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-purple-600" />
-            出现记录
+            动态
           </h2>
-          <span className="text-sm text-gray-500">{records.length} 条</span>
+          <span className="text-sm text-gray-500">{allRecords.length} 条</span>
         </div>
 
         <div className="mb-4 p-3 bg-gray-50 rounded-lg">
@@ -172,22 +219,36 @@ export default function CatDetailPage() {
         </div>
 
         <div className="space-y-4">
-          {records.map((record) => (
-            <div key={record.id} className="border-b pb-4 last:border-0">
+          {allRecords.map((record) => (
+            <div key={`${record.type}-${record.id}`} className="border-b pb-4 last:border-0">
               <div className="flex items-start gap-3 mb-2">
                 <img
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(record.username ?? "anonymous")}`}
                   alt="user"
                   className="w-10 h-10 rounded-full"
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">匿名用户</span>
-                    <Badge variant="outline" className="text-xs">
-                      出现
+                    <span className="font-medium">{record.username ?? "匿名用户"}</span>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${record.type === "feeding" ? "bg-orange-50 text-orange-700 border-orange-200" : "bg-purple-50 text-purple-700 border-purple-200"}`}
+                    >
+                      {record.type === "feeding" ? "投喂" : "出现"}
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-500 mb-2">{new Date(record.happened_at).toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 mb-1">{record.detail}</p>
+                  <p className="text-sm text-gray-500 mb-2">{new Date(record.time).toLocaleString()}</p>
+
+                  {/* 偶遇照片 */}
+                  {record.photo_url && (
+                    <img
+                      src={record.photo_url}
+                      alt="打卡照片"
+                      className="w-32 h-32 object-cover rounded-lg mb-2 border"
+                    />
+                  )}
+
                   <p className="text-gray-700 mb-2">{record.note ?? "（无备注）"}</p>
                   <div className="flex items-center gap-4 mt-3">
                     <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-purple-600">
@@ -204,10 +265,9 @@ export default function CatDetailPage() {
             </div>
           ))}
 
-          {records.length === 0 && <p className="text-sm text-gray-500">暂无出现记录（可去“打卡”页新增）</p>}
+          {allRecords.length === 0 && <p className="text-sm text-gray-500">暂无动态（可去"打卡"页新增）</p>}
         </div>
       </div>
     </div>
   );
 }
-

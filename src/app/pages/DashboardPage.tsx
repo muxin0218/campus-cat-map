@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { ArrowLeft, TrendingUp, Users, Heart, MapPin, Award, Calendar } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Award, Calendar } from 'lucide-react';
 import { listCats, listSightings } from '../api/client';
 import type { CatListItem, SightingItem } from '../api/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -52,40 +51,34 @@ export default function DashboardPage() {
     { name: '未绝育', value: notNeuteredCount || 1, color: '#fb923c' },
   ];
 
-  // 每周打卡趋势（从 sightings 数据计算）
-  const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+  // 近 7 天打卡趋势（按具体日期）
+  const dateLabels: string[] = [];
+  const dateCounts: number[] = [];
   const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    dateLabels.push(`${d.getMonth() + 1}/${d.getDate()}`);
+    dateCounts.push(0);
+  }
   for (const s of sightings) {
     const d = new Date(s.happened_at);
     const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays >= 0 && diffDays < 7) {
-      dayCounts[d.getDay()]++;
+      const idx = 6 - diffDays;
+      dateCounts[idx]++;
     }
   }
-  const weeklyData = dayNames.map((day, i) => ({
-    day,
-    count: dayCounts[i]
+  const weeklyData = dateLabels.map((label, i) => ({
+    date: label,
+    count: dateCounts[i]
   }));
 
-  // 各点位投喂频次（从 sightings 数据按经纬度聚类）
-  const locationGroups = new Map<string, { lat: number; lng: number; count: number }>();
+  // 出现点位数量
+  const locationSet = new Set<string>();
   for (const s of sightings) {
-    const key = `${s.latitude.toFixed(4)},${s.longitude.toFixed(4)}`;
-    const existing = locationGroups.get(key);
-    if (existing) {
-      existing.count++;
-    } else {
-      locationGroups.set(key, { lat: s.latitude, lng: s.longitude, count: 1 });
-    }
+    locationSet.add(`${s.latitude.toFixed(4)},${s.longitude.toFixed(4)}`);
   }
-  const locationData = Array.from(locationGroups.entries())
-    .map(([key, val]) => ({
-      name: key,
-      count: val.count
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
 
   // 明星猫咪排行（按 sightings 数量）
   const catSightingCount = new Map<number, number>();
@@ -169,13 +162,13 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-medium opacity-90">出现点位</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{locationGroups.size}</p>
+              <p className="text-3xl font-bold">{locationSet.size}</p>
               <p className="text-xs opacity-75 mt-1">不同位置</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* 每周打卡趋势 */}
+        {/* 近 7 天打卡趋势 */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -187,9 +180,9 @@ export default function DashboardPage() {
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip labelFormatter={(label) => `${label}`} formatter={(value: number) => [value, '打卡次数']} />
                 <Line
                   type="monotone"
                   dataKey="count"
@@ -198,33 +191,6 @@ export default function DashboardPage() {
                   dot={{ fill: '#667eea', r: 4 }}
                 />
               </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* 各点位投喂频次 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-purple-600" />
-              各点位打卡频次
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={locationData.length > 0 ? locationData : [{ name: '暂无数据', count: 1 }]}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="count" fill="url(#colorGradient)" radius={[8, 8, 0, 0]} />
-                <defs>
-                  <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#667eea" />
-                    <stop offset="100%" stopColor="#764ba2" />
-                  </linearGradient>
-                </defs>
-              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -317,21 +283,6 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-500 text-center py-4">暂无数据</p>
               )}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* 活跃用户榜（从 sightings 无法获取用户信息，显示提示） */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4 text-purple-600" />
-              活跃投喂/打卡用户榜
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-500 text-center py-4">
-              用户排行榜功能需要完善用户系统后启用
-            </p>
           </CardContent>
         </Card>
       </div>

@@ -20,6 +20,9 @@ export interface SightingItem {
   note: string | null;
   happened_at: string;
   created_at: string;
+  reporter_id: number | null;
+  photo_url: string | null;
+  reporter_username: string | null;
 }
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
@@ -142,8 +145,36 @@ export async function deleteFeedingPoint(id: number) {
   await fetch(`${apiBaseUrl}/api/feeding-points/${id}`, { method: "DELETE" });
 }
 
+export interface FeedingEventItem {
+  id: number;
+  feeding_point_id: number;
+  cat_id: number | null;
+  feeder_id: number | null;
+  food_type: string | null;
+  amount: string | null;
+  note: string | null;
+  fed_at: string;
+  created_at: string;
+  feeding_point_name: string | null;
+  feeder_username: string | null;
+}
+
+export async function listFeedingEvents(params?: {
+  cat_id?: number;
+  limit?: number;
+  offset?: number;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.cat_id != null) qs.set("cat_id", String(params.cat_id));
+  if (params?.limit != null) qs.set("limit", String(params.limit));
+  if (params?.offset != null) qs.set("offset", String(params.offset));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return requestJson<{ items: FeedingEventItem[] }>(`/api/feeding-events${suffix}`);
+}
+
 export async function createFeedingEvent(input: {
   feeding_point_id: number;
+  cat_id?: number;
   feeder_id?: number;
   food_type?: string;
   amount?: string;
@@ -174,7 +205,7 @@ export async function createSighting(input: {
   reporter_id?: number;
   image?: string; // base64 data URL
 }) {
-  return requestJson<SightingItem & { photo_url: string | null }>(`/api/sightings`, {
+  return requestJson<SightingItem>(`/api/sightings`, {
     method: "POST",
     body: JSON.stringify(input)
   });

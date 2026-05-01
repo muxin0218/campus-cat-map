@@ -61,7 +61,9 @@ sightingsRouter.get("/", (req, res) => {
         s.note,
         s.happened_at,
         s.created_at,
-        cp.url AS photo_url
+        s.reporter_id,
+        cp.url AS photo_url,
+        u.username AS reporter_username
       FROM public.sightings s
       LEFT JOIN LATERAL (
         SELECT p.url
@@ -70,6 +72,7 @@ sightingsRouter.get("/", (req, res) => {
         ORDER BY p.created_at DESC
         LIMIT 1
       ) cp ON true
+      LEFT JOIN public.users u ON u.id = s.reporter_id
       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY s.happened_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}
