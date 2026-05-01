@@ -6,7 +6,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import { createSighting, listCats, type CatListItem } from "../api/client";
+import { createSighting, listCats, getStoredUser, type CatListItem } from "../api/client";
 
 export default function CheckInPage() {
   const navigate = useNavigate();
@@ -80,11 +80,13 @@ export default function CheckInPage() {
 
     setSubmitting(true);
     try {
+      const user = getStoredUser();
       await createSighting({
         cat_id: catId,
         latitude: coords.lat,
         longitude: coords.lng,
-        note: noteParts.join(" ")
+        note: noteParts.join(" "),
+        reporter_id: user?.id
       });
       alert("打卡成功（已写入数据库 sightings）");
       navigate(-1);

@@ -9,7 +9,9 @@ const CreateCatSchema = z.object({
   sex: z.enum(["unknown", "male", "female"]).default("unknown"),
   description: z.string().max(500).optional(),
   neutered: z.boolean().optional(),
-  created_by: z.number().int().positive().optional()
+  created_by: z.number().int().positive().optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional()
 });
 
 catsRouter.get("/", (_req, res) => {
@@ -26,8 +28,8 @@ catsRouter.get("/", (_req, res) => {
         c.sex,
         c.description,
         c.neutered,
-        ls.latitude,
-        ls.longitude,
+        COALESCE(ls.latitude, c.latitude) AS latitude,
+        COALESCE(ls.longitude, c.longitude) AS longitude,
         ls.happened_at AS last_seen_at,
         lp.url AS photo_url
       FROM public.cats c
@@ -74,8 +76,8 @@ catsRouter.get("/:id", (req, res) => {
         c.sex,
         c.description,
         c.neutered,
-        ls.latitude,
-        ls.longitude,
+        COALESCE(ls.latitude, c.latitude) AS latitude,
+        COALESCE(ls.longitude, c.longitude) AS longitude,
         ls.happened_at AS last_seen_at,
         lp.url AS photo_url
       FROM public.cats c
@@ -114,14 +116,14 @@ catsRouter.post("/", (req, res) => {
       return res.status(400).json({ message: "Invalid request", issues: parsed.error.issues });
     }
 
-    const { name, sex, description, neutered, created_by } = parsed.data;
+    const { name, sex, description, neutered, created_by, latitude, longitude } = parsed.data;
     const { rows } = await getPool().query(
       `
-      INSERT INTO public.cats (name, sex, description, neutered, created_by)
-      VALUES ($1, $2, $3, COALESCE($4, FALSE), $5)
+      INSERT INTO public.cats (name, sex, description, neutered, created_by, latitude, longitude)
+      VALUES ($1, $2, $3, COALESCE($4, FALSE), $5, $6, $7)
       RETURNING id, name, sex, description, neutered
       `,
-      [name, sex, description ?? null, neutered ?? null, created_by ?? null]
+      [name, sex, description ?? null, neutered ?? null, created_by ?? null, latitude ?? null, longitude ?? null]
     );
 
     res.status(201).json(rows[0]);

@@ -1,33 +1,47 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { listCats, listSightings } from '../api/client';
-import type { CatListItem, SightingItem } from '../api/client';
+import { listCats, listSightings, getStoredUser, isLoggedIn, logout } from '../api/client';
+import type { CatListItem, SightingItem, UserInfo } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
-import { ArrowLeft, Camera, Heart, Star, Settings, Award, TrendingUp, MapPin } from 'lucide-react';
+import { ArrowLeft, Camera, Heart, Star, Settings, Award, TrendingUp, MapPin, LogOut } from 'lucide-react';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [cats, setCats] = useState<CatListItem[]>([]);
   const [sightings, setSightings] = useState<SightingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<UserInfo | null>(getStoredUser());
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+
+  // 监听登录状态变化
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setCurrentUser(getStoredUser());
+      setLoggedIn(isLoggedIn());
+    };
+    window.addEventListener('auth-change', handleAuthChange);
+    return () => window.removeEventListener('auth-change', handleAuthChange);
+  }, []);
 
   useEffect(() => {
     void Promise.all([
       listCats({ limit: 100 }),
-      listSightings({ limit: 50 })
+      loggedIn && currentUser
+        ? listSightings({ reporter_id: currentUser.id, limit: 50 })
+        : Promise.resolve({ items: [] })
     ])
       .then(([catsRes, sightingsRes]) => {
         setCats(catsRes.items);
-        setSightings(sightingsRes.items);
+        setSightings(sightingsRes?.items ?? []);
       })
       .catch(() => {
         setCats([]);
         setSightings([]);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [loggedIn, currentUser]);
 
   // 从 sightings 中提取打卡记录（按猫咪分组）
   const catSightingMap = new Map<number, SightingItem[]>();
@@ -90,15 +104,37 @@ export default function ProfilePage() {
         {/* 用户信息 */}
         <div className="px-4 pb-6 flex items-center gap-4">
           <img
-            src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
+            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentUser?.username ?? 'guest')}`}
             alt="用户头像"
             className="w-20 h-20 rounded-full border-4 border-white shadow-lg"
           />
           <div className="flex-1">
-            <h2 className="text-xl font-bold mb-1">访客用户</h2>
-            <Badge className="bg-white/20 text-white border-white/30">
-              普通用户
-            </Badge>
+            {loggedIn && currentUser ? (
+              <>
+                <h2 className="text-xl font-bold mb-1">{currentUser.username}</h2>
+                <Badge className="bg-white/20 text-white border-white/30">
+                  {currentUser.role === 'admin' ? '管理员' : '普通用户'}
+                </Badge>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold mb-1">未登录</h2>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="text-sm bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full transition"
+                  >
+                    登录
+                  </button>
+                  <button
+                    onClick={() => navigate('/register')}
+                    className="text-sm bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full transition"
+                  >
+                    注册
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -278,6 +314,25 @@ export default function ProfilePage() {
           </span>
           <span className="text-gray-400">›</span>
         </Button>
+        {loggedIn && (
+          <>
+            <Separator className="my-2" />
+            <Button
+              variant="ghost"
+              className="w-full justify-between py-6 text-red-600 hover:text-red-700"
+              onClick={() => {
+                logout();
+                navigate('/');
+              }}
+            >
+              <span className="flex items-center gap-3">
+                <LogOut className="h-5 w-5" />
+                退出登录
+              </span>
+              <span className="text-gray-400">›</span>
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

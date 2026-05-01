@@ -20,9 +20,13 @@ CREATE TABLE IF NOT EXISTS public.cats (
   sex TEXT NOT NULL DEFAULT 'unknown' CHECK (sex IN ('unknown', 'male', 'female')),
   description VARCHAR(500),
   neutered BOOLEAN NOT NULL DEFAULT FALSE,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
   created_by BIGINT REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ck_cats_latitude CHECK (latitude >= -90 AND latitude <= 90),
+  CONSTRAINT ck_cats_longitude CHECK (longitude >= -180 AND longitude <= 180)
 );
 
 -- Photos for cats

@@ -2,26 +2,44 @@ import { useEffect, useMemo, useState } from 'react';
 import MapView from '../components/MapView';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { MapPin, Search, Camera, Heart } from 'lucide-react';
+import { MapPin, Search, Camera, Heart, User, UtensilsCrossed } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { listCats } from '../api/client';
-import type { CatListItem } from '../api/client';
+import { listCats, listFeedingPoints, getStoredUser, isLoggedIn } from '../api/client';
+import type { CatListItem, FeedingPointItem, UserInfo } from '../api/client';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [cats, setCats] = useState<CatListItem[]>([]);
+  const [feedingPoints, setFeedingPoints] = useState<FeedingPointItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserInfo | null>(getStoredUser());
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+
+  // 监听登录状态变化
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setCurrentUser(getStoredUser());
+      setLoggedIn(isLoggedIn());
+    };
+    window.addEventListener('auth-change', handleAuthChange);
+    return () => window.removeEventListener('auth-change', handleAuthChange);
+  }, []);
 
   useEffect(() => {
-    void listCats()
-      .then((res) => {
-        setCats(res.items);
+    void Promise.all([
+      listCats(),
+      listFeedingPoints()
+    ])
+      .then(([catsRes, fpRes]) => {
+        setCats(catsRes.items);
+        setFeedingPoints(fpRes.items);
         setLoadError(null);
       })
       .catch((e: unknown) => {
         const message = e instanceof Error ? e.message : '加载失败';
         setCats([]);
+        setFeedingPoints([]);
         setLoadError(message);
       });
   }, []);
@@ -41,18 +59,29 @@ export default function HomePage() {
             <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               🐱 校园流浪猫地图
             </h1>
-            <Button
-              onClick={() => navigate('/profile')}
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 rounded-full p-0"
-            >
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-                alt="用户头像"
-                className="w-8 h-8 rounded-full"
-              />
-            </Button>
+            {loggedIn && currentUser ? (
+              <Button
+                onClick={() => navigate('/profile')}
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 rounded-full p-0 overflow-hidden"
+              >
+                <img
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentUser.username)}`}
+                  alt={currentUser.username}
+                  className="w-8 h-8 rounded-full"
+                />
+              </Button>
+            ) : (
+              <Button
+                onClick={() => navigate('/login')}
+                variant="ghost"
+                size="sm"
+                className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+              >
+                登录
+              </Button>
+            )}
           </div>
 
           {/* 搜索栏 */}
@@ -134,7 +163,7 @@ export default function HomePage() {
 
       {/* 地图视图 */}
       <div className="flex-1 relative">
-        <MapView cats={cats} />
+        <MapView cats={cats} feedingPoints={feedingPoints} />
 
         {/* 浮动底部导航 */}
         <div className="absolute bottom-4 left-4 right-4 bg-white rounded-xl shadow-lg p-2 flex justify-around z-[1000]">
@@ -159,12 +188,10 @@ export default function HomePage() {
           <Button
             variant="ghost"
             className="flex-1 flex flex-col items-center gap-1 h-auto py-2"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/feeding-points')}
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <span className="text-xs">数据</span>
+            <UtensilsCrossed className="h-5 w-5 text-orange-500" />
+            <span className="text-xs text-orange-500">投喂点</span>
           </Button>
           <Button
             variant="ghost"

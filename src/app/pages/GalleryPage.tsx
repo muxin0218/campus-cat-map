@@ -5,7 +5,7 @@ import type { CatListItem } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Search, MapPin, Heart } from 'lucide-react';
+import { ArrowLeft, Search, MapPin, Heart, Plus } from 'lucide-react';
 
 export default function GalleryPage() {
   const navigate = useNavigate();
@@ -58,7 +58,16 @@ export default function GalleryPage() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-lg font-semibold">猫咪图鉴</h1>
+            <h1 className="text-lg font-semibold flex-1">猫咪图鉴</h1>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/add-cat')}
+              className="text-purple-600 hover:text-purple-700"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              添加
+            </Button>
           </div>
 
           {/* 搜索栏 */}

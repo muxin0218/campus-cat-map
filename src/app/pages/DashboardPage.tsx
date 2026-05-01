@@ -297,8 +297,8 @@ export default function DashboardPage() {
               {topCats.length > 0 ? topCats.map((cat, index) => (
                 <div key={cat.id} className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${index === 0 ? 'bg-yellow-500' :
-                      index === 1 ? 'bg-gray-400' :
-                        'bg-orange-600'
+                    index === 1 ? 'bg-gray-400' :
+                      'bg-orange-600'
                     }`}>
                     {index + 1}
                   </div>

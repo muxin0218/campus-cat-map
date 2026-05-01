@@ -5,8 +5,16 @@ import CheckInPage from './pages/CheckInPage';
 import GalleryPage from './pages/GalleryPage';
 import ProfilePage from './pages/ProfilePage';
 import DashboardPage from './pages/DashboardPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import AddCatPage from './pages/AddCatPage';
+import FeedingPointsPage from './pages/FeedingPointsPage';
 
 export const router = createHashRouter([
+  {
+    path: '/feeding-points',
+    Component: FeedingPointsPage,
+  },
   {
     path: '/',
     Component: HomePage,
@@ -30,6 +38,18 @@ export const router = createHashRouter([
   {
     path: '/dashboard',
     Component: DashboardPage,
+  },
+  {
+    path: '/login',
+    Component: LoginPage,
+  },
+  {
+    path: '/register',
+    Component: RegisterPage,
+  },
+  {
+    path: '/add-cat',
+    Component: AddCatPage,
   },
   {
     path: '*',

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useNavigate } from "react-router";
-import type { CatListItem } from "../api/client";
+import type { CatListItem, FeedingPointItem } from "../api/client";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -11,7 +11,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png"
 });
 
-export default function MapView({ cats }: { cats: CatListItem[] }) {
+export default function MapView({
+  cats,
+  feedingPoints
+}: {
+  cats: CatListItem[];
+  feedingPoints?: FeedingPointItem[];
+}) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const markerLayer = useRef<L.LayerGroup | null>(null);
@@ -42,6 +48,7 @@ export default function MapView({ cats }: { cats: CatListItem[] }) {
 
     layer.clearLayers();
 
+    // 猫咪标记
     const catIcon = L.divIcon({
       className: "custom-cat-marker",
       html: `
@@ -100,11 +107,50 @@ export default function MapView({ cats }: { cats: CatListItem[] }) {
       marker.bindPopup(popupContent, { maxWidth: 300, className: "custom-popup" });
     }
 
+    // 投喂点标记
+    const feedingIcon = L.divIcon({
+      className: "custom-feeding-marker",
+      html: `
+        <div style="
+          width: 40px;
+          height: 40px;
+          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+          border-radius: 50%;
+          border: 3px solid white;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+        ">
+          🍽️
+        </div>
+      `,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
+      popupAnchor: [0, -20]
+    });
+
+    if (feedingPoints) {
+      for (const fp of feedingPoints) {
+        const marker = L.marker([fp.latitude, fp.longitude], { icon: feedingIcon }).addTo(layer);
+        const popupContent = `
+          <div style="min-width: 200px;">
+            <h3 style="margin: 0 0 6px 0; font-size: 16px; font-weight: 600;">🍽️ ${fp.name}</h3>
+            <p style="margin: 0; font-size: 13px; color: #666;">
+              ${fp.description ?? "暂无描述"}<br/>
+              <strong>Coords:</strong> ${fp.latitude.toFixed(5)}, ${fp.longitude.toFixed(5)}
+            </p>
+          </div>
+        `;
+        marker.bindPopup(popupContent, { maxWidth: 300, className: "custom-popup" });
+      }
+    }
+
     (window as any).viewCatDetail = (catId: string) => {
       navigate(`/cat/${catId}`);
     };
-  }, [cats, navigate]);
+  }, [cats, feedingPoints, navigate]);
 
   return <div ref={mapRef} className="w-full h-full" />;
 }
-

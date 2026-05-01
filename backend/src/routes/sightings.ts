@@ -9,12 +9,14 @@ const CreateSightingSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   note: z.string().max(500).optional(),
-  happened_at: z.string().datetime().optional()
+  happened_at: z.string().datetime().optional(),
+  reporter_id: z.number().int().positive().optional()
 });
 
 sightingsRouter.get("/", (req, res) => {
   void (async () => {
     const catId = typeof req.query.cat_id === "string" ? Number(req.query.cat_id) : undefined;
+    const reporterId = typeof req.query.reporter_id === "string" ? Number(req.query.reporter_id) : undefined;
     const from = typeof req.query.from === "string" ? req.query.from : undefined;
     const to = typeof req.query.to === "string" ? req.query.to : undefined;
     const limit = Math.min(Math.max(Number(req.query.limit ?? 50) || 50, 1), 200);
@@ -26,6 +28,10 @@ sightingsRouter.get("/", (req, res) => {
     if (Number.isFinite(catId) && (catId as number) > 0) {
       values.push(catId);
       where.push(`s.cat_id = $${values.length}`);
+    }
+    if (Number.isFinite(reporterId) && (reporterId as number) > 0) {
+      values.push(reporterId);
+      where.push(`s.reporter_id = $${values.length}`);
     }
     if (from) {
       values.push(from);
@@ -73,15 +79,15 @@ sightingsRouter.post("/", (req, res) => {
       return res.status(400).json({ message: "Invalid request", issues: parsed.error.issues });
     }
 
-    const { cat_id, latitude, longitude, note, happened_at } = parsed.data;
+    const { cat_id, latitude, longitude, note, happened_at, reporter_id } = parsed.data;
 
     const { rows } = await getPool().query(
       `
-      INSERT INTO public.sightings (cat_id, latitude, longitude, note, happened_at)
-      VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, NOW()))
+      INSERT INTO public.sightings (cat_id, latitude, longitude, note, happened_at, reporter_id)
+      VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, NOW()), $6)
       RETURNING id, cat_id, latitude, longitude, note, happened_at, created_at
       `,
-      [cat_id, latitude, longitude, note ?? null, happened_at ?? null]
+      [cat_id, latitude, longitude, note ?? null, happened_at ?? null, reporter_id ?? null]
     );
 
     res.status(201).json(rows[0]);
