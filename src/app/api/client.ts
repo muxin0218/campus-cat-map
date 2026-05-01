@@ -172,8 +172,9 @@ export async function createSighting(input: {
   note?: string;
   happened_at?: string;
   reporter_id?: number;
+  image?: string; // base64 data URL
 }) {
-  return requestJson<SightingItem>(`/api/sightings`, {
+  return requestJson<SightingItem & { photo_url: string | null }>(`/api/sightings`, {
     method: "POST",
     body: JSON.stringify(input)
   });

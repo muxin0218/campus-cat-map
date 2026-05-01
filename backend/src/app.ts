@@ -1,3 +1,4 @@
+import { join } from "path";
 import cors from "cors";
 import express from "express";
 import { catsRouter } from "./routes/cats.js";
@@ -10,7 +11,11 @@ export function createApp() {
   const app = express();
 
   app.use(cors());
-  app.use(express.json({ limit: "2mb" }));
+  // 增大 limit 以支持 base64 图片上传
+  app.use(express.json({ limit: "10mb" }));
+
+  // 静态文件：上传的图片
+  app.use("/uploads", express.static(join(process.cwd(), "uploads")));
 
   app.use("/api/health", healthRouter);
   app.use("/api/cats", catsRouter);

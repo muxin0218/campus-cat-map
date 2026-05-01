@@ -128,7 +128,8 @@ export default function CheckInPage() {
           latitude: coords.lat,
           longitude: coords.lng,
           note: comment.trim() || undefined,
-          reporter_id: user?.id
+          reporter_id: user?.id,
+          image: image ?? undefined
         });
         alert("偶遇打卡成功！");
         navigate(-1);
@@ -242,6 +243,40 @@ export default function CheckInPage() {
             <div>
               <Label className="mb-2 block">投喂量</Label>
               <Input placeholder="例如：约 50g" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {/* 上传图片（仅偶遇打卡） */}
+        {!isFeeding && (
+          <div className="bg-white rounded-lg p-4">
+            <Label className="mb-2 block flex items-center gap-1">
+              <Camera className="h-4 w-4 text-purple-500" />
+              上传照片
+            </Label>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" onClick={() => document.getElementById("photo-input")?.click()} className="shrink-0">
+                <Camera className="h-4 w-4 mr-1" />
+                选择照片
+              </Button>
+              <Input
+                id="photo-input"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              {image && (
+                <div className="relative flex-1">
+                  <img src={image} alt="预览" className="h-20 w-20 object-cover rounded-lg border" />
+                  <button
+                    onClick={() => setImage(null)}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

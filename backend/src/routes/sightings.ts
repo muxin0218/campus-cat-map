@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { join, extname } from "path";
+import { randomUUID } from "crypto";
 import { getPool } from "../db/pool.js";
 
 export const sightingsRouter = Router();
@@ -10,7 +13,8 @@ const CreateSightingSchema = z.object({
   longitude: z.number().min(-180).max(180),
   note: z.string().max(500).optional(),
   happened_at: z.string().datetime().optional(),
-  reporter_id: z.number().int().positive().optional()
+  reporter_id: z.number().int().positive().optional(),
+  image: z.string().optional() // base64 data URL (e.g. data:image/jpeg;base64,...)
 });
 
 sightingsRouter.get("/", (req, res) => {
@@ -56,8 +60,16 @@ sightingsRouter.get("/", (req, res) => {
         s.longitude,
         s.note,
         s.happened_at,
-        s.created_at
+        s.created_at,
+        cp.url AS photo_url
       FROM public.sightings s
+      LEFT JOIN LATERAL (
+        SELECT p.url
+        FROM public.cat_photos p
+        WHERE p.sighting_id = s.id
+        ORDER BY p.created_at DESC
+        LIMIT 1
+      ) cp ON true
       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY s.happened_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}
@@ -79,8 +91,9 @@ sightingsRouter.post("/", (req, res) => {
       return res.status(400).json({ message: "Invalid request", issues: parsed.error.issues });
     }
 
-    const { cat_id, latitude, longitude, note, happened_at, reporter_id } = parsed.data;
+    const { cat_id, latitude, longitude, note, happened_at, reporter_id, image } = parsed.data;
 
+    // 1. 插入 sightings
     const { rows } = await getPool().query(
       `
       INSERT INTO public.sightings (cat_id, latitude, longitude, note, happened_at, reporter_id)
@@ -90,7 +103,39 @@ sightingsRouter.post("/", (req, res) => {
       [cat_id, latitude, longitude, note ?? null, happened_at ?? null, reporter_id ?? null]
     );
 
-    res.status(201).json(rows[0]);
+    const sighting = rows[0];
+    let photoUrl: string | null = null;
+
+    // 2. 如果有图片，保存到 uploads 目录并写入 cat_photos
+    if (image) {
+      try {
+        const matches = image.match(/^data:(image\/\w+);base64,(.+)$/);
+        if (matches) {
+          const ext = matches[1].replace("image/", "");
+          const buffer = Buffer.from(matches[2], "base64");
+          const uploadDir = join(process.cwd(), "uploads");
+          if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
+          const filename = `${randomUUID()}.${ext}`;
+          const filepath = join(uploadDir, filename);
+          writeFileSync(filepath, buffer);
+
+          photoUrl = `/uploads/${filename}`;
+
+          await getPool().query(
+            `
+            INSERT INTO public.cat_photos (cat_id, url, sighting_id, uploaded_by)
+            VALUES ($1, $2, $3, $4)
+            `,
+            [cat_id, photoUrl, sighting.id, reporter_id ?? null]
+          );
+        }
+      } catch (imgErr) {
+        console.error("Failed to save image:", imgErr);
+        // 图片保存失败不阻塞打卡，继续返回
+      }
+    }
+
+    res.status(201).json({ ...sighting, photo_url: photoUrl });
   })().catch((err: any) => {
     if (err?.code === "23503") {
       return res.status(404).json({ message: "Not Found" });
