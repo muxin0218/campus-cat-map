@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import MapView from '../components/MapView';
+import BottomNav from '../components/BottomNav';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { MapPin, Search, Camera, Heart, TrendingUp, User, UtensilsCrossed } from 'lucide-react';
+import { MapPin, Search, Camera, Heart, User } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { listCats, listFeedingPoints, getStoredUser, isLoggedIn } from '../api/client';
 import type { CatListItem, FeedingPointItem, UserInfo } from '../api/client';
@@ -164,55 +165,9 @@ export default function HomePage() {
       {/* 地图视图 */}
       <div className="flex-1 relative">
         <MapView cats={cats} feedingPoints={feedingPoints} />
-
-        {/* 浮动底部导航 */}
-        <div className="absolute bottom-4 left-4 right-4 bg-white rounded-xl shadow-lg p-2 flex justify-around z-[1000]">
-          <Button
-            variant="ghost"
-            className="flex-1 flex flex-col items-center gap-1 h-auto py-2"
-            onClick={() => navigate('/')}
-          >
-            <MapPin className="h-5 w-5 text-purple-600" />
-            <span className="text-xs text-purple-600 font-medium">地图</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className="flex-1 flex flex-col items-center gap-1 h-auto py-2"
-            onClick={() => navigate('/gallery')}
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <span className="text-xs">图鉴</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className="flex-1 flex flex-col items-center gap-1 h-auto py-2"
-            onClick={() => navigate('/feeding-points')}
-          >
-            <UtensilsCrossed className="h-5 w-5 text-orange-500" />
-            <span className="text-xs text-orange-500">投喂点</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className="flex-1 flex flex-col items-center gap-1 h-auto py-2"
-            onClick={() => navigate('/dashboard')}
-          >
-            <TrendingUp className="h-5 w-5 text-green-600" />
-            <span className="text-xs text-green-600 font-medium">统计</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className="flex-1 flex flex-col items-center gap-1 h-auto py-2"
-            onClick={() => navigate('/profile')}
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span className="text-xs">我的</span>
-          </Button>
-        </div>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import BottomNav from '../components/BottomNav';
 import { listCats, listSightings, getStoredUser, isLoggedIn, logout } from '../api/client';
 import type { CatListItem, SightingItem, UserInfo } from '../api/client';
 import { Button } from '../components/ui/button';
@@ -79,7 +80,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-16">
       {/* 顶部导航 */}
       <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
         <div className="px-4 py-3 flex items-center justify-between">
@@ -334,6 +335,7 @@ export default function ProfilePage() {
           </>
         )}
       </div>
+      <BottomNav />
     </div>
   );
 }

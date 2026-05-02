@@ -169,3 +169,9 @@ def get_me(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="用户不存在")
 
     return row_to_user(users[0])
+
+
+@router.get("/me/is-admin")
+def is_admin(current_user: dict = Depends(get_current_user)):
+    """判断当前用户是否为管理员"""
+    return {"is_admin": current_user.get("role") == "admin"}

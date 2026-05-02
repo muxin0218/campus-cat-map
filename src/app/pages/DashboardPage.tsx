@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import BottomNav from '../components/BottomNav';
 import { ArrowLeft, TrendingUp, Award, Calendar } from 'lucide-react';
 import { listCats, listSightings } from '../api/client';
 import type { CatListItem, SightingItem } from '../api/client';
@@ -104,7 +105,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-6">
+    <div className="min-h-screen bg-gray-50 pb-16">
       {/* 顶部导航 */}
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="px-4 py-3 flex items-center gap-3">
@@ -286,6 +287,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      <BottomNav />
     </div>
   );
 }

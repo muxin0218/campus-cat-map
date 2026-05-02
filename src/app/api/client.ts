@@ -288,6 +288,38 @@ export async function authGetMe() {
   return (await res.json()) as UserInfo;
 }
 
+/** 缓存 isAdmin 结果，避免重复请求 */
+let isAdminCache: boolean | null = null;
+
+export async function checkIsAdmin(): Promise<boolean> {
+  // 如果有缓存直接用
+  if (isAdminCache !== null) return isAdminCache;
+
+  const token = localStorage.getItem("auth_token");
+  if (!token) {
+    isAdminCache = false;
+    return false;
+  }
+
+  try {
+    const res = await fetch(`${authBaseUrl}/api/auth/me/is-admin`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { is_admin: boolean };
+    isAdminCache = data.is_admin;
+    return data.is_admin;
+  } catch {
+    isAdminCache = false;
+    return false;
+  }
+}
+
+/** 清除 isAdmin 缓存（登出时调用） */
+export function clearIsAdminCache() {
+  isAdminCache = null;
+}
+
 export function getStoredUser(): UserInfo | null {
   try {
     const raw = localStorage.getItem("auth_user");
@@ -304,6 +336,7 @@ export function isLoggedIn(): boolean {
 export function logout() {
   localStorage.removeItem("auth_token");
   localStorage.removeItem("auth_user");
+  clearIsAdminCache();
   window.dispatchEvent(new Event("auth-change"));
 }
 

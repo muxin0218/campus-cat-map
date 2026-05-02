@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, Camera, Info, MapPin, Upload, UtensilsCrossed } from "lucide-react";
 import { Alert, AlertDescription } from "../components/ui/alert";
@@ -60,11 +60,6 @@ export default function CheckInPage() {
         .catch(() => setCats([]));
     }
   }, [isFeeding]);
-
-  const locationText = useMemo(() => {
-    if (!coords) return "";
-    return `GPS: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
-  }, [coords]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -234,13 +229,39 @@ export default function CheckInPage() {
         {!isFeeding && (
           <div className="bg-white rounded-lg p-4">
             <Label className="mb-2 block">位置信息 *</Label>
-            <div className="flex gap-2">
-              <Input placeholder="点击获取当前定位" value={locationText} readOnly className="flex-1" />
+            <div className="flex gap-2 mb-2">
+              <Input
+                placeholder="纬度 (lat)"
+                type="number"
+                step="0.000001"
+                value={coords?.lat ?? ""}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  setCoords(Number.isFinite(v) ? { lat: v, lng: coords?.lng ?? 0 } : null);
+                }}
+                className="flex-1"
+              />
+              <Input
+                placeholder="经度 (lng)"
+                type="number"
+                step="0.000001"
+                value={coords?.lng ?? ""}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  setCoords(Number.isFinite(v) ? { lat: coords?.lat ?? 0, lng: v } : null);
+                }}
+                className="flex-1"
+              />
               <Button onClick={handleGetLocation} variant="outline" className="shrink-0">
                 <MapPin className="h-4 w-4 mr-1" />
                 定位
               </Button>
             </div>
+            {coords && (
+              <p className="text-xs text-green-600">
+                ✅ 已获取位置：{coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
+              </p>
+            )}
           </div>
         )}
 

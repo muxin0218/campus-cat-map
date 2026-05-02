@@ -1,18 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { listCats } from '../api/client';
+import { listCats, checkIsAdmin } from '../api/client';
 import type { CatListItem } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Search, MapPin, Heart, Plus } from 'lucide-react';
+import BottomNav from '../components/BottomNav';
+import { ArrowLeft, Search, MapPin, Heart, Plus, UtensilsCrossed } from 'lucide-react';
 
 export default function GalleryPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'neutered' | 'friendly'>('all');
+  const [filter, setFilter] = useState<'all' | 'neutered'>('all');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [cats, setCats] = useState<CatListItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 通过后端 API 判断是否管理员
+  useEffect(() => {
+    void checkIsAdmin().then(setIsAdmin);
+    // 监听登录状态变化时重新检查
+    const handleAuthChange = () => {
+      void checkIsAdmin().then(setIsAdmin);
+    };
+    window.addEventListener('auth-change', handleAuthChange);
+    return () => window.removeEventListener('auth-change', handleAuthChange);
+  }, []);
 
   useEffect(() => {
     void listCats()
@@ -27,7 +40,6 @@ export default function GalleryPage() {
     if (!matchSearch) return false;
 
     if (filter === 'neutered') return cat.neutered;
-    if (filter === 'friendly') return cat.description?.includes('亲人') ?? false;
     return true;
   });
 
@@ -59,6 +71,17 @@ export default function GalleryPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <h1 className="text-lg font-semibold flex-1">猫咪图鉴</h1>
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/feeding-points')}
+                className="text-orange-600 hover:text-orange-700"
+              >
+                <UtensilsCrossed className="h-4 w-4 mr-1" />
+                投喂点
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -99,21 +122,13 @@ export default function GalleryPage() {
             >
               已绝育 ({cats.filter((c) => c.neutered).length})
             </Button>
-            <Button
-              variant={filter === 'friendly' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter('friendly')}
-              className={filter === 'friendly' ? 'bg-purple-600 hover:bg-purple-700' : ''}
-            >
-              亲人 ({cats.filter((c) => c.description?.includes('亲人')).length})
-            </Button>
           </div>
         </div>
       </header>
 
       {/* 猫咪卡片网格 */}
       <div className="p-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {filteredCats.map((cat) => (
             <div
               key={cat.id}
@@ -125,7 +140,7 @@ export default function GalleryPage() {
                 <img
                   src={cat.photo_url ?? 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=400'}
                   alt={cat.name}
-                  className="w-full h-40 object-cover"
+                  className="w-full aspect-square object-cover"
                 />
                 <div className="absolute top-2 right-2">
                   <Badge className="bg-white/90 text-gray-800 border-0">
@@ -169,27 +184,7 @@ export default function GalleryPage() {
         )}
       </div>
 
-      {/* 统计信息 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p className="text-2xl font-bold text-purple-600">{cats.length}</p>
-            <p className="text-xs text-gray-500">总猫咪数</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-green-600">
-              {cats.filter((c) => c.neutered).length}
-            </p>
-            <p className="text-xs text-gray-500">已绝育</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-orange-600">
-              {cats.filter((c) => c.description?.includes('亲人')).length}
-            </p>
-            <p className="text-xs text-gray-500">性格亲人</p>
-          </div>
-        </div>
-      </div>
+      <BottomNav />
     </div>
   );
 }

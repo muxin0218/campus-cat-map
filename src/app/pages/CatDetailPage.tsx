@@ -106,7 +106,7 @@ export default function CatDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="relative">
-        <img src={headerImg} alt={cat.name} className="w-full h-72 object-cover" />
+        <img src={headerImg} alt={cat.name} className="w-full aspect-square max-h-96 object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
 
         <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
