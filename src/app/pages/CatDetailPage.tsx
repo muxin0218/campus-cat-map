@@ -205,7 +205,7 @@ export default function CatDetailPage() {
 
         <div className="mb-4 p-3 bg-gray-50 rounded-lg">
           <Textarea
-            placeholder="写点备注（本页面暂不提交，仅示意）..."
+            placeholder="写点备注..."
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             className="mb-2 resize-none"

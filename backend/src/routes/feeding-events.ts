@@ -20,12 +20,13 @@ const ReviewFeedingEventSchema = z.object({
     status: z.enum(["approved", "rejected"])
 });
 
-// GET /api/feeding-events?cat_id=xxx
+// GET /api/feeding-events?cat_id=xxx&status=xxx
 feedingEventsRouter.get("/", (req, res) => {
     void (async () => {
         const catId = typeof req.query.cat_id === "string" ? Number(req.query.cat_id) : undefined;
         const limit = Math.min(Math.max(Number(req.query.limit ?? 50) || 50, 1), 200);
         const offset = Math.max(Number(req.query.offset ?? 0) || 0, 0);
+        const statusFilter = typeof req.query.status === "string" ? req.query.status : null;
 
         const where: string[] = [];
         const values: any[] = [];
@@ -35,9 +36,14 @@ feedingEventsRouter.get("/", (req, res) => {
             where.push(`fe.cat_id = $${values.length}`);
         }
 
-        // status 过滤
-        const sf = statusFilterClause(req.authUser);
-        const statusClause = sf.clause ? sf.clause.replace(/AND (\w+\.)?status/g, "AND fe.status") : "";
+        // status 过滤：管理员可指定 status，否则走默认角色过滤
+        let statusClause = "";
+        if (statusFilter && req.authUser?.role === "admin") {
+            statusClause = `AND fe.status = '${statusFilter.replace(/[^a-z]/g, "")}'`;
+        } else {
+            const sf = statusFilterClause(req.authUser);
+            statusClause = sf.clause ? sf.clause.replace(/AND (\w+\.)?status/g, "AND fe.status") : "";
+        }
 
         values.push(limit);
         const limitIdx = values.length;

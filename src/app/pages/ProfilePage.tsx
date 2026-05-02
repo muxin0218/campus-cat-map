@@ -6,7 +6,7 @@ import type { CatListItem, SightingItem, UserInfo } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
-import { ArrowLeft, Camera, Heart, Star, Settings, Award, TrendingUp, MapPin, LogOut } from 'lucide-react';
+import { ArrowLeft, Camera, Heart, Star, Settings, Award, TrendingUp, MapPin, LogOut, Shield } from 'lucide-react';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -210,47 +210,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <Separator />
-
-      {/* 我的收藏 */}
-      <div className="bg-white px-4 py-4 mb-2">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Star className="h-5 w-5 text-orange-600" />
-            猫咪列表
-          </h3>
-          <Button variant="ghost" size="sm" className="text-purple-600">
-            查看全部
-          </Button>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {cats.slice(0, 6).map((cat) => (
-            <div
-              key={cat.id}
-              onClick={() => navigate(`/cat/${cat.id}`)}
-              className="cursor-pointer"
-            >
-              <img
-                src={cat.photo_url ?? 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=400'}
-                alt={cat.name}
-                className="w-full aspect-square object-cover rounded-lg mb-1"
-              />
-              <p className="text-xs font-medium truncate">{cat.name}</p>
-              <p className="text-xs text-gray-500 truncate flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {cat.latitude != null && cat.longitude != null
-                  ? `${cat.latitude.toFixed(4)}, ${cat.longitude.toFixed(4)}`
-                  : '暂无定位'}
-              </p>
-            </div>
-          ))}
-        </div>
-        {cats.length === 0 && (
-          <p className="text-sm text-gray-500 text-center py-4">暂无猫咪数据</p>
-        )}
-      </div>
-
-      <Separator />
 
       {/* 打卡记录 */}
       <div className="bg-white px-4 py-4 mb-2">
@@ -293,6 +252,22 @@ export default function ProfilePage() {
 
       {/* 功能菜单 */}
       <div className="bg-white px-4 py-2 mb-20">
+        {loggedIn && currentUser?.role === 'admin' && (
+          <>
+            <Button
+              variant="ghost"
+              className="w-full justify-between py-6"
+              onClick={() => navigate('/review')}
+            >
+              <span className="flex items-center gap-3">
+                <Shield className="h-5 w-5 text-purple-600" />
+                审核管理
+              </span>
+              <span className="text-gray-400">›</span>
+            </Button>
+            <Separator className="my-2" />
+          </>
+        )}
         <Button
           variant="ghost"
           className="w-full justify-between py-6"

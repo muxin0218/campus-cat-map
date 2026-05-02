@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import BottomNav from '../components/BottomNav';
-import { ArrowLeft, TrendingUp, Award, Calendar } from 'lucide-react';
-import { listCats, listSightings } from '../api/client';
-import type { CatListItem, SightingItem } from '../api/client';
+import { ArrowLeft, TrendingUp, Award, Calendar, Users } from 'lucide-react';
+import { listCats, listSightings, listFeedingEvents } from '../api/client';
+import type { CatListItem, SightingItem, FeedingEventItem } from '../api/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 export default function DashboardPage() {
@@ -94,6 +94,19 @@ export default function DashboardPage() {
       photo_url: cat.photo_url
     }))
     .sort((a, b) => b.checkIns - a.checkIns)
+    .slice(0, 3);
+
+  // 积极用户排行（按 sightings 数量）
+  const userSightingCount = new Map<string, { username: string; count: number; photoSeed: string }>();
+  for (const s of sightings) {
+    const name = s.reporter_username ?? '匿名用户';
+    const seed = s.reporter_username ?? `user_${s.reporter_id}`;
+    const entry = userSightingCount.get(name) ?? { username: name, count: 0, photoSeed: seed };
+    entry.count++;
+    userSightingCount.set(name, entry);
+  }
+  const topUsers = Array.from(userSightingCount.values())
+    .sort((a, b) => b.count - a.count)
     .slice(0, 3);
 
   if (loading) {
@@ -279,6 +292,42 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500">{cat.checkIns} 次打卡</p>
                   </div>
                   {index === 0 && <span className="text-2xl">👑</span>}
+                </div>
+              )) : (
+                <p className="text-sm text-gray-500 text-center py-4">暂无数据</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 积极用户排行榜 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-600" />
+              积极用户排行榜
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {topUsers.length > 0 ? topUsers.map((user, index) => (
+                <div key={user.username} className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${index === 0 ? 'bg-yellow-500' :
+                    index === 1 ? 'bg-gray-400' :
+                      'bg-orange-600'
+                    }`}>
+                    {index + 1}
+                  </div>
+                  <img
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.photoSeed)}`}
+                    alt={user.username}
+                    className="w-12 h-12 rounded-full object-cover bg-gray-100"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium">{user.username}</p>
+                    <p className="text-xs text-gray-500">{user.count} 次打卡</p>
+                  </div>
+                  {index === 0 && <span className="text-2xl">🏆</span>}
                 </div>
               )) : (
                 <p className="text-sm text-gray-500 text-center py-4">暂无数据</p>

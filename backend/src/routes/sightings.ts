@@ -31,6 +31,7 @@ sightingsRouter.get("/", (req, res) => {
     const to = typeof req.query.to === "string" ? req.query.to : undefined;
     const limit = Math.min(Math.max(Number(req.query.limit ?? 50) || 50, 1), 200);
     const offset = Math.max(Number(req.query.offset ?? 0) || 0, 0);
+    const statusFilter = typeof req.query.status === "string" ? req.query.status : null;
 
     const where: string[] = [];
     const values: any[] = [];
@@ -52,10 +53,14 @@ sightingsRouter.get("/", (req, res) => {
       where.push(`s.happened_at <= $${values.length}::timestamptz`);
     }
 
-    // status 过滤
-    const sf = statusFilterClause(req.authUser);
-    // statusFilterClause 返回 "AND status = 'approved'"，转为 "s.status"
-    const statusClause = sf.clause ? sf.clause.replace(/AND (\w+\.)?status/g, "AND s.status") : "";
+    // status 过滤：管理员可指定 status，否则走默认角色过滤
+    let statusClause = "";
+    if (statusFilter && req.authUser?.role === "admin") {
+      statusClause = `AND s.status = '${statusFilter.replace(/[^a-z]/g, "")}'`;
+    } else {
+      const sf = statusFilterClause(req.authUser);
+      statusClause = sf.clause ? sf.clause.replace(/AND (\w+\.)?status/g, "AND s.status") : "";
+    }
 
     values.push(limit);
     const limitIdx = values.length;

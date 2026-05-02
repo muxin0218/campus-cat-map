@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AddCatPage from './pages/AddCatPage';
 import FeedingPointsPage from './pages/FeedingPointsPage';
+import ReviewPage from './pages/ReviewPage';
 
 export const router = createHashRouter([
   {
@@ -18,6 +19,10 @@ export const router = createHashRouter([
   {
     path: '/',
     Component: HomePage,
+  },
+  {
+    path: '/review',
+    Component: ReviewPage,
   },
   {
     path: '/cat/:id',

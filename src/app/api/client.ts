@@ -6,6 +6,9 @@ export interface CatListItem {
   sex: Sex;
   description: string | null;
   neutered: boolean;
+  status?: string;
+  created_by?: number | null;
+  created_at?: string;
   latitude: number | null;
   longitude: number | null;
   last_seen_at: string | null;
@@ -18,6 +21,7 @@ export interface SightingItem {
   latitude: number;
   longitude: number;
   note: string | null;
+  status?: string;
   happened_at: string;
   created_at: string;
   reporter_id: number | null;
@@ -50,11 +54,12 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function listCats(params?: { q?: string; limit?: number; offset?: number }) {
+export async function listCats(params?: { q?: string; limit?: number; offset?: number; status?: string }) {
   const qs = new URLSearchParams();
   if (params?.q) qs.set("q", params.q);
   if (params?.limit != null) qs.set("limit", String(params.limit));
   if (params?.offset != null) qs.set("offset", String(params.offset));
+  if (params?.status) qs.set("status", params.status);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return requestJson<{ items: CatListItem[] }>(`/api/cats${suffix}`);
 }
@@ -85,6 +90,7 @@ export async function listSightings(params?: {
   to?: string;
   limit?: number;
   offset?: number;
+  status?: string;
 }) {
   const qs = new URLSearchParams();
   if (params?.cat_id != null) qs.set("cat_id", String(params.cat_id));
@@ -93,6 +99,7 @@ export async function listSightings(params?: {
   if (params?.to) qs.set("to", params.to);
   if (params?.limit != null) qs.set("limit", String(params.limit));
   if (params?.offset != null) qs.set("offset", String(params.offset));
+  if (params?.status) qs.set("status", params.status);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return requestJson<{ items: SightingItem[] }>(`/api/sightings${suffix}`);
 }
@@ -153,6 +160,7 @@ export interface FeedingEventItem {
   food_type: string | null;
   amount: string | null;
   note: string | null;
+  status?: string;
   fed_at: string;
   created_at: string;
   feeding_point_name: string | null;
@@ -163,11 +171,13 @@ export async function listFeedingEvents(params?: {
   cat_id?: number;
   limit?: number;
   offset?: number;
+  status?: string;
 }) {
   const qs = new URLSearchParams();
   if (params?.cat_id != null) qs.set("cat_id", String(params.cat_id));
   if (params?.limit != null) qs.set("limit", String(params.limit));
   if (params?.offset != null) qs.set("offset", String(params.offset));
+  if (params?.status) qs.set("status", params.status);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return requestJson<{ items: FeedingEventItem[] }>(`/api/feeding-events${suffix}`);
 }
@@ -338,5 +348,49 @@ export function logout() {
   localStorage.removeItem("auth_user");
   clearIsAdminCache();
   window.dispatchEvent(new Event("auth-change"));
+}
+
+// ─── 审核 API（调用 Express 后端，需带 token） ──────
+
+async function authRequestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = localStorage.getItem("auth_token");
+  const res = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {})
+    }
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as any;
+      if (body?.message) message = body.message;
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+  return (await res.json()) as T;
+}
+
+export async function reviewCat(id: number, status: "approved" | "rejected") {
+  return authRequestJson<{ id: number; name: string; status: string }>(`/api/cats/${id}/review`, {
+    method: "PUT",
+    body: JSON.stringify({ status })
+  });
+}
+
+export async function reviewSighting(id: number, status: "approved" | "rejected") {
+  return authRequestJson<{ id: number; cat_id: number; status: string }>(`/api/sightings/${id}/review`, {
+    method: "PUT",
+    body: JSON.stringify({ status })
+  });
+}
+
+export async function reviewFeedingEvent(id: number, status: "approved" | "rejected") {
+  return authRequestJson<{ id: number; feeding_point_id: number; status: string }>(`/api/feeding-events/${id}/review`, {
+    method: "PUT",
+    body: JSON.stringify({ status })
+  });
 }
 

@@ -18,14 +18,23 @@ const ReviewCatSchema = z.object({
   status: z.enum(["approved", "rejected"])
 });
 
-// GET /api/cats - 列表（普通用户只看 approved，管理员看全部）
+// GET /api/cats - 列表
+// 普通用户只看 approved，管理员看全部（也可用 ?status= 指定）
 catsRouter.get("/", (_req, res) => {
   void (async () => {
     const q = typeof _req.query.q === "string" && _req.query.q.trim() ? _req.query.q.trim() : null;
     const limit = Math.min(Math.max(Number(_req.query.limit ?? 20) || 20, 1), 100);
     const offset = Math.max(Number(_req.query.offset ?? 0) || 0, 0);
+    const statusFilter = typeof _req.query.status === "string" ? _req.query.status : null;
 
-    const sf = statusFilterClause(_req.authUser);
+    // status 过滤：管理员可指定 status，否则走默认角色过滤
+    let statusClause = "";
+    if (statusFilter && _req.authUser?.role === "admin") {
+      statusClause = `AND c.status = '${statusFilter.replace(/[^a-z]/g, "")}'`;
+    } else {
+      const sf = statusFilterClause(_req.authUser);
+      statusClause = sf.clause;
+    }
 
     const { rows } = await getPool().query(
       `
@@ -36,6 +45,8 @@ catsRouter.get("/", (_req, res) => {
         c.description,
         c.neutered,
         c.status,
+        c.created_by,
+        c.created_at,
         ls.latitude,
         ls.longitude,
         ls.happened_at AS last_seen_at,
@@ -56,7 +67,7 @@ catsRouter.get("/", (_req, res) => {
         LIMIT 1
       ) lp ON true
       WHERE ($1::text IS NULL OR c.name ILIKE ('%' || $1 || '%'))
-        ${sf.clause}
+        ${statusClause}
       ORDER BY c.id DESC
       LIMIT $2 OFFSET $3
       `,
