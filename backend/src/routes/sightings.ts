@@ -4,6 +4,7 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join, extname } from "path";
 import { randomUUID } from "crypto";
 import { getPool } from "../db/pool.js";
+import { statusFilterClause, requireAdmin } from "../auth/middleware.js";
 
 export const sightingsRouter = Router();
 
@@ -15,6 +16,11 @@ const CreateSightingSchema = z.object({
   happened_at: z.string().datetime().optional(),
   reporter_id: z.number().int().positive().optional(),
   image: z.string().optional() // base64 data URL (e.g. data:image/jpeg;base64,...)
+});
+
+// 审核入参
+const ReviewSightingSchema = z.object({
+  status: z.enum(["approved", "rejected"])
 });
 
 sightingsRouter.get("/", (req, res) => {
@@ -46,6 +52,11 @@ sightingsRouter.get("/", (req, res) => {
       where.push(`s.happened_at <= $${values.length}::timestamptz`);
     }
 
+    // status 过滤
+    const sf = statusFilterClause(req.authUser);
+    // statusFilterClause 返回 "AND status = 'approved'"，转为 "s.status"
+    const statusClause = sf.clause ? sf.clause.replace(/AND (\w+\.)?status/g, "AND s.status") : "";
+
     values.push(limit);
     const limitIdx = values.length;
     values.push(offset);
@@ -59,6 +70,7 @@ sightingsRouter.get("/", (req, res) => {
         s.latitude,
         s.longitude,
         s.note,
+        s.status,
         s.happened_at,
         s.created_at,
         s.reporter_id,
@@ -74,6 +86,7 @@ sightingsRouter.get("/", (req, res) => {
       ) cp ON true
       LEFT JOIN public.users u ON u.id = s.reporter_id
       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ${statusClause}
       ORDER BY s.happened_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}
       `,
@@ -96,12 +109,12 @@ sightingsRouter.post("/", (req, res) => {
 
     const { cat_id, latitude, longitude, note, happened_at, reporter_id, image } = parsed.data;
 
-    // 1. 插入 sightings
+    // 1. 插入 sightings，status 固定为 pending
     const { rows } = await getPool().query(
       `
-      INSERT INTO public.sightings (cat_id, latitude, longitude, note, happened_at, reporter_id)
-      VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, NOW()), $6)
-      RETURNING id, cat_id, latitude, longitude, note, happened_at, created_at
+      INSERT INTO public.sightings (cat_id, latitude, longitude, note, happened_at, reporter_id, status)
+      VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, NOW()), $6, 'pending')
+      RETURNING id, cat_id, latitude, longitude, note, happened_at, created_at, status
       `,
       [cat_id, latitude, longitude, note ?? null, happened_at ?? null, reporter_id ?? null]
     );
@@ -144,6 +157,36 @@ sightingsRouter.post("/", (req, res) => {
       return res.status(404).json({ message: "Not Found" });
     }
     console.error("POST /api/sightings failed:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  });
+});
+
+// PUT /api/sightings/:id/review - 管理员审核
+sightingsRouter.put("/:id/review", requireAdmin, (req, res) => {
+  void (async () => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: "Invalid id" });
+    }
+
+    const parsed = ReviewSightingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid request", issues: parsed.error.issues });
+    }
+
+    const { status } = parsed.data;
+    const { rows } = await getPool().query(
+      `UPDATE public.sightings SET status = $1 WHERE id = $2 RETURNING id, cat_id, status`,
+      [status, id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Not Found" });
+    }
+
+    res.status(200).json(rows[0]);
+  })().catch(() => {
+    console.error("PUT /api/sightings/:id/review failed");
     res.status(500).json({ message: "Internal Server Error" });
   });
 });

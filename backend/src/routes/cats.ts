@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getPool } from "../db/pool.js";
+import { statusFilterClause, requireAdmin } from "../auth/middleware.js";
 
 export const catsRouter = Router();
 
@@ -12,11 +13,19 @@ const CreateCatSchema = z.object({
   created_by: z.number().int().positive().optional()
 });
 
+// 审核入参
+const ReviewCatSchema = z.object({
+  status: z.enum(["approved", "rejected"])
+});
+
+// GET /api/cats - 列表（普通用户只看 approved，管理员看全部）
 catsRouter.get("/", (_req, res) => {
   void (async () => {
     const q = typeof _req.query.q === "string" && _req.query.q.trim() ? _req.query.q.trim() : null;
     const limit = Math.min(Math.max(Number(_req.query.limit ?? 20) || 20, 1), 100);
     const offset = Math.max(Number(_req.query.offset ?? 0) || 0, 0);
+
+    const sf = statusFilterClause(_req.authUser);
 
     const { rows } = await getPool().query(
       `
@@ -26,6 +35,7 @@ catsRouter.get("/", (_req, res) => {
         c.sex,
         c.description,
         c.neutered,
+        c.status,
         ls.latitude,
         ls.longitude,
         ls.happened_at AS last_seen_at,
@@ -46,6 +56,7 @@ catsRouter.get("/", (_req, res) => {
         LIMIT 1
       ) lp ON true
       WHERE ($1::text IS NULL OR c.name ILIKE ('%' || $1 || '%'))
+        ${sf.clause}
       ORDER BY c.id DESC
       LIMIT $2 OFFSET $3
       `,
@@ -59,12 +70,15 @@ catsRouter.get("/", (_req, res) => {
   });
 });
 
+// GET /api/cats/:id - 详情（同样过滤 status）
 catsRouter.get("/:id", (req, res) => {
   void (async () => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id) || id <= 0) {
       return res.status(400).json({ message: "Invalid id" });
     }
+
+    const sf = statusFilterClause(req.authUser);
 
     const { rows } = await getPool().query(
       `
@@ -74,6 +88,7 @@ catsRouter.get("/:id", (req, res) => {
         c.sex,
         c.description,
         c.neutered,
+        c.status,
         ls.latitude,
         ls.longitude,
         ls.happened_at AS last_seen_at,
@@ -93,7 +108,7 @@ catsRouter.get("/:id", (req, res) => {
         ORDER BY p.created_at DESC
         LIMIT 1
       ) lp ON true
-      WHERE c.id = $1
+      WHERE c.id = $1 ${sf.clause}
       `,
       [id]
     );
@@ -107,6 +122,7 @@ catsRouter.get("/:id", (req, res) => {
   });
 });
 
+// POST /api/cats - 添加猫咪（新建时 status 自动为 pending）
 catsRouter.post("/", (req, res) => {
   void (async () => {
     const parsed = CreateCatSchema.safeParse(req.body);
@@ -117,9 +133,9 @@ catsRouter.post("/", (req, res) => {
     const { name, sex, description, neutered, created_by } = parsed.data;
     const { rows } = await getPool().query(
       `
-      INSERT INTO public.cats (name, sex, description, neutered, created_by)
-      VALUES ($1, $2, $3, COALESCE($4, FALSE), $5)
-      RETURNING id, name, sex, description, neutered
+      INSERT INTO public.cats (name, sex, description, neutered, created_by, status)
+      VALUES ($1, $2, $3, COALESCE($4, FALSE), $5, 'pending')
+      RETURNING id, name, sex, description, neutered, status
       `,
       [name, sex, description ?? null, neutered ?? null, created_by ?? null]
     );
@@ -127,6 +143,36 @@ catsRouter.post("/", (req, res) => {
     res.status(201).json(rows[0]);
   })().catch(() => {
     console.error("POST /api/cats failed");
+    res.status(500).json({ message: "Internal Server Error" });
+  });
+});
+
+// PUT /api/cats/:id/review - 管理员审核
+catsRouter.put("/:id/review", requireAdmin, (req, res) => {
+  void (async () => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: "Invalid id" });
+    }
+
+    const parsed = ReviewCatSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid request", issues: parsed.error.issues });
+    }
+
+    const { status } = parsed.data;
+    const { rows } = await getPool().query(
+      `UPDATE public.cats SET status = $1 WHERE id = $2 RETURNING id, name, status`,
+      [status, id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Not Found" });
+    }
+
+    res.status(200).json(rows[0]);
+  })().catch(() => {
+    console.error("PUT /api/cats/:id/review failed");
     res.status(500).json({ message: "Internal Server Error" });
   });
 });

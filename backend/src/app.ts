@@ -6,6 +6,7 @@ import { feedingPointsRouter } from "./routes/feeding-points.js";
 import { feedingEventsRouter } from "./routes/feeding-events.js";
 import { healthRouter } from "./routes/health.js";
 import { sightingsRouter } from "./routes/sightings.js";
+import { parseAuth } from "./auth/middleware.js";
 
 export function createApp() {
   const app = express();
@@ -16,6 +17,9 @@ export function createApp() {
 
   // 静态文件：上传的图片
   app.use("/uploads", express.static(join(process.cwd(), "uploads")));
+
+  // 全局 JWT 解析（不拦截，只把用户信息挂到 req 上）
+  app.use(parseAuth);
 
   app.use("/api/health", healthRouter);
   app.use("/api/cats", catsRouter);
