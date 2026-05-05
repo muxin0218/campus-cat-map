@@ -46,8 +46,8 @@ export default function AddCatPage() {
                 created_by: user.id,
                 ...(hasPosition ? { latitude: lat, longitude: lng } : {})
             });
-            alert("添加成功！");
-            navigate(`/cat/${result.id}`);
+            alert("添加成功！已提交审核，请等待管理员审核通过。");
+            navigate(`/gallery`);
         } catch (e: any) {
             alert(`添加失败：${e?.message ?? "未知错误"}`);
         } finally {

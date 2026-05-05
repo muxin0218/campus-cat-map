@@ -36,9 +36,9 @@ export default function ReviewPage() {
         setLoading(true);
         try {
             const [cats, sightings, feedEvents] = await Promise.all([
-                listCats({ status: "pending", limit: 100 }),
-                listSightings({ status: "pending", limit: 100 }),
-                listFeedingEvents({ status: "pending", limit: 100 }),
+                listCats({ status: "pending", limit: 100 }, { auth: true }),
+                listSightings({ status: "pending", limit: 100 }, { auth: true }),
+                listFeedingEvents({ status: "pending", limit: 100 }, { auth: true }),
             ]);
             setPendingCats(cats.items);
             setPendingSightings(sightings.items);
@@ -147,8 +147,8 @@ export default function ReviewPage() {
                             key={t.key}
                             onClick={() => setTab(t.key)}
                             className={`flex-1 py-3 text-sm font-medium text-center border-b-2 transition ${tab === t.key
-                                    ? "border-purple-600 text-purple-600"
-                                    : "border-transparent text-gray-500"
+                                ? "border-purple-600 text-purple-600"
+                                : "border-transparent text-gray-500"
                                 }`}
                         >
                             {t.label}

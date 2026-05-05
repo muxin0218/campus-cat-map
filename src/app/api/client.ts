@@ -54,14 +54,19 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function listCats(params?: { q?: string; limit?: number; offset?: number; status?: string }) {
+export async function listCats(params?: { q?: string; limit?: number; offset?: number; status?: string }, options?: { auth?: boolean }) {
   const qs = new URLSearchParams();
   if (params?.q) qs.set("q", params.q);
   if (params?.limit != null) qs.set("limit", String(params.limit));
   if (params?.offset != null) qs.set("offset", String(params.offset));
   if (params?.status) qs.set("status", params.status);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return requestJson<{ items: CatListItem[] }>(`/api/cats${suffix}`);
+  const headers: Record<string, string> = {};
+  if (options?.auth) {
+    const token = localStorage.getItem("auth_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  return requestJson<{ items: CatListItem[] }>(`/api/cats${suffix}`, { headers });
 }
 
 export async function getCat(id: number) {
@@ -91,7 +96,7 @@ export async function listSightings(params?: {
   limit?: number;
   offset?: number;
   status?: string;
-}) {
+}, options?: { auth?: boolean }) {
   const qs = new URLSearchParams();
   if (params?.cat_id != null) qs.set("cat_id", String(params.cat_id));
   if (params?.reporter_id != null) qs.set("reporter_id", String(params.reporter_id));
@@ -101,7 +106,12 @@ export async function listSightings(params?: {
   if (params?.offset != null) qs.set("offset", String(params.offset));
   if (params?.status) qs.set("status", params.status);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return requestJson<{ items: SightingItem[] }>(`/api/sightings${suffix}`);
+  const headers: Record<string, string> = {};
+  if (options?.auth) {
+    const token = localStorage.getItem("auth_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  return requestJson<{ items: SightingItem[] }>(`/api/sightings${suffix}`, { headers });
 }
 
 export interface FeedingPointItem {
@@ -172,14 +182,19 @@ export async function listFeedingEvents(params?: {
   limit?: number;
   offset?: number;
   status?: string;
-}) {
+}, options?: { auth?: boolean }) {
   const qs = new URLSearchParams();
   if (params?.cat_id != null) qs.set("cat_id", String(params.cat_id));
   if (params?.limit != null) qs.set("limit", String(params.limit));
   if (params?.offset != null) qs.set("offset", String(params.offset));
   if (params?.status) qs.set("status", params.status);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return requestJson<{ items: FeedingEventItem[] }>(`/api/feeding-events${suffix}`);
+  const headers: Record<string, string> = {};
+  if (options?.auth) {
+    const token = localStorage.getItem("auth_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  return requestJson<{ items: FeedingEventItem[] }>(`/api/feeding-events${suffix}`, { headers });
 }
 
 export async function createFeedingEvent(input: {
